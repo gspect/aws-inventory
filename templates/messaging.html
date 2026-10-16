@@ -1,0 +1,684 @@
+{% extends "base.html" %}
+{% block title %}Messaging (SQS / SNS){% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Tabs ── */
+  .tab-bar { display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid #2d3148; padding-bottom:0; }
+  .tab-btn { padding:8px 18px; font-size:13px; font-weight:600; border-radius:8px 8px 0 0;
+             border:1px solid transparent; border-bottom:none; cursor:pointer;
+             color:#64748b; background:transparent; transition:all .15s; }
+  .tab-btn:hover { color:#cbd5e1; background:#1a1d27; }
+  .tab-btn.active { color:#f1f5f9; background:#141722; border-color:#2d3148; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Search bar ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Cards ── */
+  .msg-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+              padding:18px 22px; margin-bottom:10px; transition:border-color .15s, background .15s; }
+  .msg-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .msg-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .msg-card-title  { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .msg-card-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px; word-break:break-all; }
+  .msg-card-meta   { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .msg-meta-item   { font-size:12px; color:#64748b; }
+  .msg-meta-item span { color:#cbd5e1; }
+  .msg-card-actions { margin-left:auto; }
+
+  /* ── Depth meters ── */
+  .depth-pill { display:inline-flex; flex-direction:column; align-items:center;
+                padding:4px 12px; border-radius:8px; min-width:60px; }
+  .depth-pill.empty    { background:#0f1117; border:1px solid #1e2130; }
+  .depth-pill.low      { background:#0f2d1a; border:1px solid #4ade8040; }
+  .depth-pill.medium   { background:#2a2010; border:1px solid #fcd34d40; }
+  .depth-pill.high     { background:#2a1010; border:1px solid #fca5a540; }
+  .depth-num  { font-size:16px; font-weight:700; line-height:1.2; }
+  .depth-pill.empty .depth-num   { color:#475569; }
+  .depth-pill.low .depth-num     { color:#4ade80; }
+  .depth-pill.medium .depth-num  { color:#fcd34d; }
+  .depth-pill.high .depth-num    { color:#fca5a5; }
+  .depth-lbl  { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#475569; }
+
+  /* ── Type / state badges ── */
+  .badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700;
+           text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+  .badge-fifo      { background:#1e2d4a; color:#93c5fd; }
+  .badge-standard  { background:#141722; color:#64748b; border:1px solid #2d3148; }
+  .badge-enabled   { background:#14352a; color:#6ee7b7; }
+  .badge-disabled  { background:#2a1010; color:#fca5a5; }
+  .badge-sqs       { background:#1e2d4a; color:#93c5fd; }
+  .badge-sns       { background:#2a1020; color:#f9a8d4; }
+  .badge-dynamodb  { background:#14352a; color:#6ee7b7; }
+  .badge-kinesis   { background:#1e2040; color:#a5b4fc; }
+  .badge-kafka     { background:#2a2010; color:#fcd34d; }
+  .badge-other     { background:#1e2130; color:#94a3b8; }
+  .badge-lambda    { background:#2a1a10; color:#fb923c; }
+  .badge-https     { background:#1e2040; color:#a5b4fc; }
+  .badge-email     { background:#1a1d27; color:#94a3b8; }
+
+  /* ── Detail view ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:13px; color:#64748b; margin-top:4px; font-family:monospace; word-break:break-all; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:13px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:200px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Consumer / subscription rows ── */
+  .consumer-row { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;
+                  padding:12px 0; border-bottom:1px solid #1e2130; }
+  .consumer-row:last-child { border-bottom:none; }
+  .consumer-name { font-size:14px; font-weight:600; color:#f1f5f9; font-family:monospace; }
+  .consumer-arn  { font-size:12px; color:#64748b; font-family:monospace; word-break:break-all; }
+  .consumer-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
+  .consumer-meta-item { font-size:12px; color:#64748b; }
+  .consumer-meta-item span { color:#cbd5e1; }
+
+  .sub-row { display:grid; grid-template-columns:120px 1fr; gap:6px 16px;
+             padding:8px 0; border-bottom:1px solid #1e2130; font-size:13px; }
+  .sub-row:last-child { border-bottom:none; }
+  .sub-protocol { color:#94a3b8; font-weight:600; font-size:11px; text-transform:uppercase;
+                  letter-spacing:.4px; padding-top:2px; }
+  .sub-endpoint { color:#cbd5e1; font-family:monospace; word-break:break-all; }
+  .sub-endpoint a { color:#7dd3fc; text-decoration:none; }
+  .sub-endpoint a:hover { text-decoration:underline; }
+
+  /* ── DLQ table ── */
+  .dlq-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .dlq-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase;
+                  letter-spacing:.5px; color:#475569; padding:8px 12px;
+                  border-bottom:1px solid #2d3148; white-space:nowrap; }
+  .dlq-table td { padding:10px 12px; border-bottom:1px solid #1e2130; color:#cbd5e1;
+                  vertical-align:middle; }
+  .dlq-table tr:last-child td { border-bottom:none; }
+  .dlq-table tr:hover td { background:#1a1d27; }
+  .dlq-depth-hot  { color:#fca5a5; font-weight:700; }
+  .dlq-depth-zero { color:#475569; }
+
+  /* ── Depth group headers ── */
+  .depth-group { display:flex; gap:16px; align-items:center; margin-bottom:6px; }
+
+  /* ── Empty / error states ── */
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-box  { background:#2a1010; border:1px solid #fca5a540; border-radius:8px;
+                color:#fca5a5; padding:14px 18px; font-size:13px; margin-bottom:20px; }
+
+  /* ── Detail button ── */
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; white-space:nowrap; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Bool pills ── */
+  .bool-yes { color:#6ee7b7; font-weight:600; }
+  .bool-no  { color:#475569; }
+
+  /* ── Inline link ── */
+  .arn-link { color:#7dd3fc; text-decoration:none; font-family:monospace; font-size:12px; }
+  .arn-link:hover { text-decoration:underline; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('sqs_queues', 0) }}</span><span class="stat-lbl">SQS Queues</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('sns_topics', 0) }}</span><span class="stat-lbl">SNS Topics</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('lambda_esms', 0) }}</span><span class="stat-lbl">Lambda Triggers</span></div>
+{% endblock %}
+
+{% block content %}
+
+{# ════════════════════════════════════════════
+   QUEUE DETAIL VIEW
+════════════════════════════════════════════ #}
+{% if view == 'queue_detail' and detail and detail.queue %}
+{% set q = detail.queue %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/messaging">Messaging</a>
+  <span>›</span>
+  <a href="/aws-inventory/messaging?tab=queues{% if query %}&q={{ query }}{% endif %}">SQS Queues</a>
+  <span>›</span>
+  {{ q.queue_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ q.queue_name }}</div>
+    <span class="badge badge-{{ q.queue_type }}">{{ q.queue_type }}</span>
+    {% if q.kms_key_id %}<span class="badge badge-other">🔐 Encrypted</span>{% endif %}
+  </div>
+  <div class="detail-sub">{{ q.queue_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ q.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ q.region }}</span></div>
+    <div class="detail-meta-item">Visibility Timeout: <span>{{ q.visibility_timeout }}s</span></div>
+    <div class="detail-meta-item">Retention: <span>{{ (q.retention_seconds // 86400) if q.retention_seconds else '—' }} days</span></div>
+    <div class="detail-meta-item">Receive Wait: <span>{{ q.receive_wait_seconds or 0 }}s</span></div>
+    {% if q.delay_seconds %}<div class="detail-meta-item">Delay: <span>{{ q.delay_seconds }}s</span></div>{% endif %}
+  </div>
+  {% if q.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ q.tags | tojson }}'>
+      🏷 {{ q.tags | length }} tags
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Message Depths -->
+<div class="section-card">
+  <div class="section-title">📬 Message Depths</div>
+  <div style="display:flex;gap:20px;flex-wrap:wrap;">
+    {% set d = q.approx_messages or 0 %}
+    <div class="depth-pill {{ 'high' if d > 1000 else 'medium' if d > 100 else 'low' if d > 0 else 'empty' }}">
+      <span class="depth-num">{{ d }}</span>
+      <span class="depth-lbl">Visible</span>
+    </div>
+    {% set inf = q.approx_not_visible or 0 %}
+    <div class="depth-pill {{ 'medium' if inf > 100 else 'low' if inf > 0 else 'empty' }}">
+      <span class="depth-num">{{ inf }}</span>
+      <span class="depth-lbl">In-Flight</span>
+    </div>
+    {% set del = q.approx_delayed or 0 %}
+    <div class="depth-pill {{ 'low' if del > 0 else 'empty' }}">
+      <span class="depth-num">{{ del }}</span>
+      <span class="depth-lbl">Delayed</span>
+    </div>
+  </div>
+</div>
+
+<!-- Lambda Consumers -->
+<div class="section-card">
+  <div class="section-title">⚡ Lambda Consumers ({{ detail.consumers | length }})</div>
+  {% if detail.consumers %}
+    {% for c in detail.consumers %}
+    <div class="consumer-row">
+      <div style="flex:1;min-width:200px;">
+        <div class="consumer-name">{{ c.function_name }}</div>
+        <div class="consumer-arn">{{ c.function_arn }}</div>
+        <div class="consumer-meta">
+          <div class="consumer-meta-item">State: <span class="{{ 'bool-yes' if c.state == 'Enabled' else 'bool-no' }}">{{ c.state }}</span></div>
+          <div class="consumer-meta-item">Batch Size: <span>{{ c.batch_size or '—' }}</span></div>
+          {% if c.max_batching_window %}<div class="consumer-meta-item">Batching Window: <span>{{ c.max_batching_window }}s</span></div>{% endif %}
+          {% if c.max_concurrency %}<div class="consumer-meta-item">Max Concurrency: <span>{{ c.max_concurrency }}</span></div>{% endif %}
+          <div class="consumer-meta-item">Bisect on Error: <span class="{{ 'bool-yes' if c.bisect_on_error else 'bool-no' }}">{{ 'Yes' if c.bisect_on_error else 'No' }}</span></div>
+        </div>
+      </div>
+      <a class="btn-detail" href="/aws-inventory/messaging?tab=lambda&q={{ c.function_name }}">View Trigger →</a>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-results" style="padding:20px 0;">No Lambda event source mappings found for this queue.</div>
+  {% endif %}
+</div>
+
+<!-- Inbound SNS Topics -->
+<div class="section-card">
+  <div class="section-title">📢 Inbound SNS Sources ({{ detail.sns_sources | length }})</div>
+  {% if detail.sns_sources %}
+    {% for s in detail.sns_sources %}
+    <div class="consumer-row">
+      <div style="flex:1;">
+        <div class="consumer-name">{{ s.topic_name }}</div>
+        <div class="consumer-arn">{{ s.topic_arn }}</div>
+        <div class="consumer-meta">
+          <div class="consumer-meta-item">Account: <span>{{ s.account_name }}</span></div>
+          <div class="consumer-meta-item">Region: <span>{{ s.region }}</span></div>
+        </div>
+      </div>
+      <a class="btn-detail" href="/aws-inventory/messaging?topic_arn={{ s.topic_arn | urlencode }}&account={{ s.account_name }}">View Topic →</a>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-results" style="padding:20px 0;">No SNS topics fan out to this queue.</div>
+  {% endif %}
+</div>
+
+<!-- DLQ Info -->
+<div class="section-card">
+  <div class="section-title">☠ Dead Letter Queue</div>
+  {% if detail.queue.dlq_arn %}
+  <div class="kv-grid">
+    <div class="kv-label">DLQ ARN</div>
+    <div class="kv-value">
+      <a class="arn-link" href="/aws-inventory/messaging?queue_arn={{ detail.queue.dlq_arn | urlencode }}&account={{ detail.queue.account_name }}">
+        {{ detail.dlq_name or detail.queue.dlq_arn }}
+      </a>
+    </div>
+    <div class="kv-label">Max Receives Before DLQ</div>
+    <div class="kv-value">{{ detail.queue.dlq_max_receives or '—' }}</div>
+  </div>
+  {% else %}
+  <div class="no-results" style="padding:12px 0;">No DLQ configured for this queue.</div>
+  {% endif %}
+</div>
+
+<!-- Queues that use THIS queue as their DLQ -->
+{% if detail.dlq_sources %}
+<div class="section-card">
+  <div class="section-title">🔁 Source Queues Using This as DLQ ({{ detail.dlq_sources | length }})</div>
+  {% for src in detail.dlq_sources %}
+  <div class="consumer-row">
+    <div style="flex:1;">
+      <div class="consumer-name">{{ src.queue_name }}</div>
+      <div class="consumer-arn">{{ src.queue_arn }}</div>
+      <div class="consumer-meta">
+        <div class="consumer-meta-item">Account: <span>{{ src.account_name }}</span></div>
+        <div class="consumer-meta-item">Region: <span>{{ src.region }}</span></div>
+      </div>
+    </div>
+    <a class="btn-detail" href="/aws-inventory/messaging?queue_arn={{ src.queue_arn | urlencode }}&account={{ src.account_name }}">View Queue →</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Queue URL -->
+<div class="section-card">
+  <div class="section-title">⚙ Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">Queue URL</div>
+    <div class="kv-value">{{ detail.queue.queue_url }}</div>
+    {% if detail.queue.kms_key_id %}
+    <div class="kv-label">KMS Key</div>
+    <div class="kv-value">{{ detail.queue.kms_key_id }}</div>
+    {% endif %}
+    <div class="kv-label">Max Message Size</div>
+    <div class="kv-value">{{ (detail.queue.max_message_size // 1024) if detail.queue.max_message_size else '—' }} KB</div>
+  </div>
+</div>
+
+
+{# ════════════════════════════════════════════
+   TOPIC DETAIL VIEW
+════════════════════════════════════════════ #}
+{% elif view == 'topic_detail' and detail and detail.topic %}
+{% set t = detail.topic %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/messaging">Messaging</a>
+  <span>›</span>
+  <a href="/aws-inventory/messaging?tab=topics{% if query %}&q={{ query }}{% endif %}">SNS Topics</a>
+  <span>›</span>
+  {{ t.topic_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ t.topic_name }}</div>
+    {% if t.fifo_topic %}<span class="badge badge-fifo">FIFO</span>{% endif %}
+    {% if t.display_name %}<span style="color:#64748b;font-size:13px;">{{ t.display_name }}</span>{% endif %}
+  </div>
+  <div class="detail-sub">{{ t.topic_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ t.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ t.region }}</span></div>
+    <div class="detail-meta-item">Confirmed Subscriptions: <span>{{ t.subscriptions_confirmed }}</span></div>
+    <div class="detail-meta-item">Pending: <span>{{ t.subscriptions_pending }}</span></div>
+    {% if t.kms_key_id %}<div class="detail-meta-item">KMS: <span>{{ t.kms_key_id }}</span></div>{% endif %}
+  </div>
+  {% if t.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ t.tags | tojson }}'>
+      🏷 {{ t.tags | length }} tags
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Subscriptions grouped by protocol -->
+<div class="section-card">
+  <div class="section-title">📋 Subscriptions ({{ detail.subscriptions | length }})</div>
+  {% if detail.subscriptions %}
+    {% set protocols = detail.subscriptions | map(attribute='protocol') | unique | list %}
+    {% for proto in protocols | sort %}
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span class="badge badge-{{ proto | lower }}">{{ proto }}</span>
+          <span style="font-size:12px;color:#475569;">
+            {{ detail.subscriptions | selectattr('protocol','equalto',proto) | list | length }} subscription(s)
+          </span>
+        </div>
+        {% for sub in detail.subscriptions if sub.protocol == proto %}
+        <div class="sub-row">
+          <div class="sub-protocol">{{ sub.protocol }}</div>
+          <div class="sub-endpoint">
+            {% if sub.protocol == 'sqs' %}
+              <a class="arn-link" href="/aws-inventory/messaging?queue_arn={{ sub.endpoint | urlencode }}&account={{ sub.account_name }}">
+                {{ sub.endpoint_name or sub.endpoint }}
+              </a>
+              <div style="font-size:11px;color:#475569;margin-top:2px;">{{ sub.endpoint }}</div>
+            {% elif sub.protocol == 'lambda' %}
+              {{ sub.endpoint_name or sub.endpoint }}
+              <div style="font-size:11px;color:#475569;margin-top:2px;">{{ sub.endpoint }}</div>
+            {% else %}
+              {{ sub.endpoint }}
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="no-results" style="padding:20px 0;">No subscriptions found for this topic.</div>
+  {% endif %}
+</div>
+
+
+{# ════════════════════════════════════════════
+   LIST VIEW
+════════════════════════════════════════════ #}
+{% else %}
+
+{% if error %}
+<div class="error-box">{{ error }}</div>
+{% endif %}
+
+<div class="tab-bar">
+  <button class="tab-btn {% if active_tab == 'queues' %}active{% endif %}"
+          onclick="switchTab('queues', event)">📦 SQS Queues</button>
+  <button class="tab-btn {% if active_tab == 'topics' %}active{% endif %}"
+          onclick="switchTab('topics', event)">📢 SNS Topics</button>
+  <button class="tab-btn {% if active_tab == 'lambda' %}active{% endif %}"
+          onclick="switchTab('lambda', event)">⚡ Lambda Triggers</button>
+  <button class="tab-btn {% if active_tab == 'dlq' %}active{% endif %}"
+          onclick="switchTab('dlq', event)">☠ DLQ Analysis</button>
+</div>
+
+
+<!-- ═══════ SQS QUEUES ═══════ -->
+<div id="tab-queues" class="tab-pane {% if active_tab == 'queues' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/messaging">
+    <input type="hidden" name="tab" value="queues">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search queue name, ARN, account…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if queues %}
+    {% for q in queues %}
+    {% set d = q.approx_messages or 0 %}
+    <div class="msg-card">
+      <div class="msg-card-header">
+        <div style="flex:1;min-width:160px;">
+          <div class="msg-card-title">{{ q.queue_name }}</div>
+          <div class="msg-card-sub">{{ q.queue_arn }}</div>
+        </div>
+        <span class="badge badge-{{ q.queue_type }}">{{ q.queue_type }}</span>
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div class="depth-pill {{ 'high' if d > 1000 else 'medium' if d > 100 else 'low' if d > 0 else 'empty' }}">
+            <span class="depth-num">{{ d }}</span>
+            <span class="depth-lbl">Visible</span>
+          </div>
+          <div class="depth-pill {{ 'medium' if (q.approx_not_visible or 0) > 100 else 'low' if (q.approx_not_visible or 0) > 0 else 'empty' }}">
+            <span class="depth-num">{{ q.approx_not_visible or 0 }}</span>
+            <span class="depth-lbl">In-Flight</span>
+          </div>
+        </div>
+        <div class="msg-card-actions">
+          <a class="btn-detail" href="/aws-inventory/messaging?queue_arn={{ q.queue_arn | urlencode }}&account={{ q.account_name }}&q={{ query }}">Details →</a>
+        </div>
+      </div>
+      <div class="msg-card-meta">
+        <div class="msg-meta-item">Account: <span>{{ q.account_name }}</span></div>
+        <div class="msg-meta-item">Region: <span>{{ q.region }}</span></div>
+        <div class="msg-meta-item">Visibility Timeout: <span>{{ q.visibility_timeout }}s</span></div>
+        <div class="msg-meta-item">Retention: <span>{{ (q.retention_seconds // 86400) if q.retention_seconds else '—' }}d</span></div>
+        {% if q.dlq_arn %}
+        <div class="msg-meta-item">DLQ: <span style="color:#fcd34d;">✓ Configured</span></div>
+        {% endif %}
+        {% if q.kms_key_id %}
+        <div class="msg-meta-item">Encrypted: <span class="bool-yes">Yes</span></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No queues found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No SQS queues found. Run the messaging collector to populate data.</div>
+  {% endif %}
+</div>
+
+
+<!-- ═══════ SNS TOPICS ═══════ -->
+<div id="tab-topics" class="tab-pane {% if active_tab == 'topics' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/messaging">
+    <input type="hidden" name="tab" value="topics">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search topic name, ARN, display name, account…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if topics %}
+    {% for t in topics %}
+    <div class="msg-card">
+      <div class="msg-card-header">
+        <div style="flex:1;min-width:160px;">
+          <div class="msg-card-title">{{ t.topic_name }}</div>
+          <div class="msg-card-sub">{{ t.topic_arn }}</div>
+        </div>
+        {% if t.fifo_topic %}<span class="badge badge-fifo">FIFO</span>{% endif %}
+        <div class="msg-card-actions">
+          <a class="btn-detail" href="/aws-inventory/messaging?topic_arn={{ t.topic_arn | urlencode }}&account={{ t.account_name }}&q={{ query }}">Details →</a>
+        </div>
+      </div>
+      <div class="msg-card-meta">
+        <div class="msg-meta-item">Account: <span>{{ t.account_name }}</span></div>
+        <div class="msg-meta-item">Region: <span>{{ t.region }}</span></div>
+        <div class="msg-meta-item">Subscriptions: <span>{{ t.subscriptions_confirmed }}</span></div>
+        {% if t.display_name %}<div class="msg-meta-item">Display Name: <span>{{ t.display_name }}</span></div>{% endif %}
+        {% if t.kms_key_id %}<div class="msg-meta-item">Encrypted: <span class="bool-yes">Yes</span></div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No topics found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No SNS topics found. Run the messaging collector to populate data.</div>
+  {% endif %}
+</div>
+
+
+<!-- ═══════ LAMBDA TRIGGERS ═══════ -->
+<div id="tab-lambda" class="tab-pane {% if active_tab == 'lambda' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/messaging">
+    <input type="hidden" name="tab" value="lambda">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search Lambda name, ARN, event source ARN, account…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if esms %}
+    {% for e in esms %}
+    <div class="msg-card">
+      <div class="msg-card-header">
+        <div style="flex:1;min-width:160px;">
+          <div class="msg-card-title">{{ e.function_name }}</div>
+          <div class="msg-card-sub">{{ e.function_arn }}</div>
+        </div>
+        <span class="badge badge-{{ e.event_source_type }}">{{ e.event_source_type }}</span>
+        <span class="badge badge-{{ 'enabled' if e.state == 'Enabled' else 'disabled' }}">{{ e.state }}</span>
+      </div>
+      <div class="msg-card-meta">
+        <div class="msg-meta-item">Account: <span>{{ e.account_name }}</span></div>
+        <div class="msg-meta-item">Region: <span>{{ e.region }}</span></div>
+        <div class="msg-meta-item">Batch Size: <span>{{ e.batch_size or '—' }}</span></div>
+        {% if e.max_batching_window %}<div class="msg-meta-item">Batching Window: <span>{{ e.max_batching_window }}s</span></div>{% endif %}
+        {% if e.max_concurrency %}<div class="msg-meta-item">Max Concurrency: <span>{{ e.max_concurrency }}</span></div>{% endif %}
+        <div class="msg-meta-item">Bisect on Error: <span class="{{ 'bool-yes' if e.bisect_on_error else 'bool-no' }}">{{ 'Yes' if e.bisect_on_error else 'No' }}</span></div>
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Event Source</div>
+        {% if e.event_source_type == 'sqs' %}
+          <a class="arn-link" href="/aws-inventory/messaging?queue_arn={{ e.event_source_arn | urlencode }}&account={{ e.account_name }}">
+            {{ e.event_source_arn }}
+          </a>
+        {% elif e.event_source_type == 'sns' %}
+          <a class="arn-link" href="/aws-inventory/messaging?topic_arn={{ e.event_source_arn | urlencode }}&account={{ e.account_name }}">
+            {{ e.event_source_arn }}
+          </a>
+        {% else %}
+          <span class="mono" style="font-size:12px;color:#94a3b8;">{{ e.event_source_arn }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No Lambda triggers found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No Lambda event source mappings found. Run the messaging collector to populate data.</div>
+  {% endif %}
+</div>
+
+
+<!-- ═══════ DLQ ANALYSIS ═══════ -->
+<div id="tab-dlq" class="tab-pane {% if active_tab == 'dlq' %}active{% endif %}">
+  <div style="margin-bottom:18px;font-size:13px;color:#64748b;">
+    All queues with a Dead Letter Queue configured. DLQ depth highlights queues that may need attention.
+  </div>
+
+  {% if dlq_summary %}
+  <table class="dlq-table">
+    <thead>
+      <tr>
+        <th>Source Queue</th>
+        <th>DLQ</th>
+        <th style="text-align:center;">Visible</th>
+        <th style="text-align:center;">In-Flight</th>
+        <th style="text-align:center;">Max Receives</th>
+        <th style="text-align:center;">DLQ Depth</th>
+        <th>Account</th>
+        <th>Region</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in dlq_summary %}
+      <tr>
+        <td>
+          <a class="arn-link" href="/aws-inventory/messaging?queue_arn={{ row.src_arn | urlencode }}&account={{ row.account_name }}">
+            {{ row.src_name }}
+          </a>
+        </td>
+        <td>
+          {% if row.dlq_name %}
+          <a class="arn-link" href="/aws-inventory/messaging?queue_arn={{ row.dlq_arn | urlencode }}&account={{ row.account_name }}">
+            {{ row.dlq_name }}
+          </a>
+          {% else %}
+          <span style="font-size:12px;color:#475569;">{{ row.dlq_arn }}</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% set d = row.src_depth or 0 %}
+          <span class="{{ 'dlq-depth-hot' if d > 1000 else '' }}">{{ d }}</span>
+        </td>
+        <td style="text-align:center;">{{ row.src_inflight or 0 }}</td>
+        <td style="text-align:center;">{{ row.max_receives or '—' }}</td>
+        <td style="text-align:center;">
+          {% set dd = row.dlq_depth or 0 %}
+          <span class="{{ 'dlq-depth-hot' if dd > 0 else 'dlq-depth-zero' }}">{{ dd }}</span>
+        </td>
+        <td>{{ row.account_name }}</td>
+        <td>{{ row.region }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="no-results">No queues with DLQ configurations found. Run the messaging collector to populate data.</div>
+  {% endif %}
+</div>
+
+<script>
+function switchTab(tab, e) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (e && e.target) e.target.classList.add('active');
+}
+</script>
+
+{% endif %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+
+  document.body.appendChild(pop);
+
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.tag-popover').forEach(p => p.remove());
+});
+</script>
+{% endblock %}
+
+{% endblock %}

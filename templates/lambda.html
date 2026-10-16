@@ -1,0 +1,792 @@
+{% extends "base.html" %}
+{% block title %}Lambda Functions{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Tabs ── */
+  .tab-bar { display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid #2d3148; padding-bottom:0; }
+  .tab-btn { padding:8px 18px; font-size:13px; font-weight:600; border-radius:8px 8px 0 0;
+             border:1px solid transparent; border-bottom:none; cursor:pointer;
+             color:#64748b; background:transparent; transition:all .15s; }
+  .tab-btn:hover { color:#cbd5e1; background:#1a1d27; }
+  .tab-btn.active { color:#f1f5f9; background:#141722; border-color:#2d3148; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Search / filter row ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input  { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                       border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row select { padding:9px 14px; background:#141722; border:1px solid #2d3148;
+                       border-radius:8px; color:#f1f5f9; font-size:13px; cursor:pointer; }
+  .search-row select:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+  .clear-btn { padding:9px 14px; background:transparent; color:#64748b;
+               border:1px solid #2d3148; border-radius:8px; font-size:13px;
+               font-weight:600; cursor:pointer; text-decoration:none; transition:all .15s; }
+  .clear-btn:hover { color:#f1f5f9; border-color:#3d4468; }
+
+  /* ── Function cards ── */
+  .fn-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+             padding:16px 20px; margin-bottom:10px;
+             transition:border-color .15s, background .15s; }
+  .fn-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .fn-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .fn-card-title  { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .fn-card-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px;
+                    word-break:break-all; }
+  .fn-card-meta   { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .fn-meta-item   { font-size:12px; color:#64748b; }
+  .fn-meta-item span { color:#cbd5e1; }
+  .fn-card-actions { margin-left:auto; flex-shrink:0; }
+
+  /* ── Badges ── */
+  .badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700;
+           text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+
+  /* State */
+  .state-active   { background:#14352a; color:#6ee7b7; }
+  .state-inactive { background:#2a1010; color:#fca5a5; }
+  .state-failed   { background:#3a1010; color:#f87171; }
+  .state-pending  { background:#2a2010; color:#fcd34d; }
+  .state-other    { background:#1e2130; color:#94a3b8; }
+
+  /* Runtime */
+  .rt-python  { background:#1e2d4a; color:#93c5fd; }
+  .rt-node    { background:#14352a; color:#6ee7b7; }
+  .rt-java    { background:#2a2010; color:#fcd34d; }
+  .rt-go      { background:#1e2040; color:#a5b4fc; }
+  .rt-ruby    { background:#3a1010; color:#f87171; }
+  .rt-dotnet  { background:#2a1020; color:#f9a8d4; }
+  .rt-custom  { background:#2a1a10; color:#fb923c; }
+  .rt-container { background:#1a2535; color:#67e8f9; }
+  .rt-other   { background:#1e2130; color:#94a3b8; }
+
+  /* Arch */
+  .arch-arm { background:#1a1f35; color:#a5b4fc; }
+  .arch-x86 { background:#1e2130; color:#94a3b8; }
+
+  /* Update status */
+  .upd-successful { background:#14352a; color:#6ee7b7; }
+  .upd-failed     { background:#2a1010; color:#fca5a5; }
+  .upd-inprogress { background:#2a2010; color:#fcd34d; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:4px;
+                   word-break:break-all; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:220px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Summary table ── */
+  .sum-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .sum-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase;
+                  letter-spacing:.5px; color:#475569; padding:0 12px 10px 0;
+                  border-bottom:1px solid #1e2130; }
+  .sum-table td { padding:9px 12px 9px 0; border-bottom:1px solid #1e2130;
+                  color:#cbd5e1; vertical-align:top; }
+  .sum-table tr:last-child td { border-bottom:none; }
+  .sum-table td.mono { font-family:monospace; font-size:12px; }
+  .sum-table td.dim  { color:#475569; font-size:12px; }
+  .sum-table td.num  { text-align:right; color:#f1f5f9; font-weight:600; }
+
+  /* ── Chip rows ── */
+  .chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0;
+          background:#1a1d27; border:1px solid #2d3148; border-radius:5px;
+          font-size:11px; font-family:monospace; color:#94a3b8; }
+  .chip.vpc   { background:#1a2d1a; border-color:#2d4d2d; color:#6ee7b7; }
+  .chip.warn  { background:#2a2010; border-color:#4a3010; color:#fcd34d; }
+
+  /* ── Env key pills ── */
+  .env-key  { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0;
+              background:#1e2040; border-radius:5px; font-size:11px;
+              font-family:monospace; color:#a5b4fc; }
+
+  /* ── ESM rows ── */
+  .esm-row { display:flex; align-items:center; gap:10px; padding:9px 0;
+             border-bottom:1px solid #1e2130; flex-wrap:wrap; }
+  .esm-row:last-child { border-bottom:none; }
+  .esm-source { font-size:12px; font-family:monospace; color:#cbd5e1; flex:1; word-break:break-all; }
+
+  /* ── Detail view action button ── */
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  .bool-yes { color:#6ee7b7; font-weight:600; }
+  .bool-no  { color:#475569; }
+
+  /* ── Size helpers ── */
+  .code-size { font-size:11px; color:#475569; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+
+  /* ── Runtime bar ── */
+  .rt-bar-wrap { background:#0f1117; border-radius:4px; overflow:hidden;
+                 height:8px; min-width:60px; flex:1; max-width:200px; }
+  .rt-bar-fill { height:100%; background:#3b82f6; border-radius:4px; transition:width .3s; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('lambda_functions', 0) }}</span><span class="stat-lbl">Functions</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('lambda_runtimes', 0) }}</span><span class="stat-lbl">Runtimes</span></div>
+{% endblock %}
+
+{% block content %}
+
+{# ══════════════════════════════════════════════════
+   DETAIL VIEW
+══════════════════════════════════════════════════ #}
+{% if view == 'detail' and detail %}
+{% set fn = detail.fn %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/lambda">Lambda</a>
+  <span>›</span>
+  {{ fn.function_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ fn.function_name }}</div>
+    {% set st = (fn.state or 'Active') | lower %}
+    <span class="badge state-{{ st if st in ['active','inactive','failed','pending'] else 'other' }}">
+      {{ fn.state or 'Active' }}
+    </span>
+    {% set rt = fn.runtime or '' %}
+    {% if fn.package_type == 'Image' %}
+      <span class="badge rt-container">Container</span>
+    {% elif 'python' in rt %}
+      <span class="badge rt-python">{{ rt }}</span>
+    {% elif 'node' in rt %}
+      <span class="badge rt-node">{{ rt }}</span>
+    {% elif 'java' in rt %}
+      <span class="badge rt-java">{{ rt }}</span>
+    {% elif 'go' in rt %}
+      <span class="badge rt-go">{{ rt }}</span>
+    {% elif 'ruby' in rt %}
+      <span class="badge rt-ruby">{{ rt }}</span>
+    {% elif 'dotnet' in rt %}
+      <span class="badge rt-dotnet">{{ rt }}</span>
+    {% elif 'provided' in rt %}
+      <span class="badge rt-custom">{{ rt }}</span>
+    {% elif rt %}
+      <span class="badge rt-other">{{ rt }}</span>
+    {% endif %}
+    {% if fn.architecture %}
+      <span class="badge {{ 'arch-arm' if 'arm' in fn.architecture else 'arch-x86' }}">
+        {{ fn.architecture }}
+      </span>
+    {% endif %}
+    {% if fn.last_update_status and fn.last_update_status != 'Successful' %}
+      {% set upd = fn.last_update_status | lower | replace(' ','') %}
+      <span class="badge upd-{{ upd if upd in ['failed','inprogress'] else 'other' }}">
+        Update: {{ fn.last_update_status }}
+      </span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ fn.function_arn }}</div>
+  {% if fn.description %}
+  <div style="font-size:13px;color:#94a3b8;margin-top:8px;">{{ fn.description }}</div>
+  {% endif %}
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ fn.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ fn.region }}</span></div>
+    {% if fn.modified_at %}
+    <div class="detail-meta-item">Last Modified: <span>{{ fn.modified_at }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Configuration -->
+<div class="section-card">
+  <div class="section-title">Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">Handler</div>
+    <div class="kv-value">{{ fn.handler or '—' }}</div>
+
+    <div class="kv-label">Runtime</div>
+    <div class="kv-value">{{ fn.runtime or ('Container Image' if fn.package_type == 'Image' else '—') }}</div>
+
+    <div class="kv-label">Architecture</div>
+    <div class="kv-value">{{ fn.architecture or 'x86_64' }}</div>
+
+    <div class="kv-label">Memory</div>
+    <div class="kv-value">{{ fn.memory_mb }} MB</div>
+
+    <div class="kv-label">Timeout</div>
+    <div class="kv-value">{{ fn.timeout_sec }}s{% if fn.timeout_sec %} ({{ (fn.timeout_sec / 60) | round(1) }}m){% endif %}</div>
+
+    <div class="kv-label">Package Type</div>
+    <div class="kv-value">{{ fn.package_type or 'Zip' }}</div>
+
+    <div class="kv-label">Code Size</div>
+    <div class="kv-value">
+      {% if fn.code_size %}
+        {% if fn.code_size > 1048576 %}{{ (fn.code_size / 1048576) | round(2) }} MB
+        {% elif fn.code_size > 1024 %}{{ (fn.code_size / 1024) | round(1) }} KB
+        {% else %}{{ fn.code_size }} B{% endif %}
+      {% else %}—{% endif %}
+    </div>
+
+    {% if fn.ephemeral_storage_mb %}
+    <div class="kv-label">Ephemeral Storage</div>
+    <div class="kv-value">{{ fn.ephemeral_storage_mb }} MB /tmp</div>
+    {% endif %}
+
+    <div class="kv-label">Reserved Concurrency</div>
+    <div class="kv-value">
+      {% if fn.reserved_concurrency is not none and fn.reserved_concurrency != '' %}
+        {% if fn.reserved_concurrency == 0 %}
+          <span style="color:#fca5a5;">0 (throttled — no invocations allowed)</span>
+        {% else %}
+          {{ fn.reserved_concurrency }}
+        {% endif %}
+      {% else %}
+        <span class="bool-no">Unreserved (uses account pool)</span>
+      {% endif %}
+    </div>
+
+    <div class="kv-label">Execution Role</div>
+    <div class="kv-value">{{ fn.role_arn or '—' }}</div>
+
+    {% if fn.kms_key_arn %}
+    <div class="kv-label">KMS Key</div>
+    <div class="kv-value">{{ fn.kms_key_arn }}</div>
+    {% endif %}
+
+    {% if fn.code_signing_config_arn %}
+    <div class="kv-label">Code Signing</div>
+    <div class="kv-value">{{ fn.code_signing_config_arn }}</div>
+    {% endif %}
+
+    {% if fn.image_uri %}
+    <div class="kv-label">Image URI</div>
+    <div class="kv-value">{{ fn.image_uri }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Networking -->
+<div class="section-card">
+  <div class="section-title">Networking</div>
+  {% if fn.vpc_id %}
+  <div class="kv-grid">
+    <div class="kv-label">VPC</div>
+    <div class="kv-value"><span class="chip vpc">{{ fn.vpc_id }}</span></div>
+
+    {% if fn.subnet_ids %}
+    <div class="kv-label">Subnets</div>
+    <div class="kv-value">
+      {% for s in fn.subnet_ids | fromjson %}
+      <span class="chip">{{ s }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if fn.sg_ids %}
+    <div class="kv-label">Security Groups</div>
+    <div class="kv-value">
+      {% for sg in fn.sg_ids | fromjson %}
+      <span class="chip">{{ sg }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div style="font-size:13px;color:#475569;">No VPC — function runs in Lambda-managed network.</div>
+  {% endif %}
+</div>
+
+<!-- Logging -->
+<div class="section-card">
+  <div class="section-title">Logging &amp; Observability</div>
+  <div class="kv-grid">
+    <div class="kv-label">Log Group</div>
+    <div class="kv-value">{{ fn.logging_log_group or ('/aws/lambda/' + fn.function_name) }}</div>
+    {% if fn.logging_log_format %}
+    <div class="kv-label">Log Format</div>
+    <div class="kv-value">{{ fn.logging_log_format }}</div>
+    {% endif %}
+    {% if fn.logging_app_level %}
+    <div class="kv-label">Application Log Level</div>
+    <div class="kv-value">{{ fn.logging_app_level }}</div>
+    {% endif %}
+    {% if fn.logging_sys_level %}
+    <div class="kv-label">System Log Level</div>
+    <div class="kv-value">{{ fn.logging_sys_level }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- SnapStart -->
+{% if fn.snap_start_apply_on and fn.snap_start_apply_on != 'None' %}
+<div class="section-card">
+  <div class="section-title">SnapStart</div>
+  <div class="kv-grid">
+    <div class="kv-label">Apply On</div>
+    <div class="kv-value">{{ fn.snap_start_apply_on }}</div>
+    <div class="kv-label">Optimization</div>
+    <div class="kv-value">{{ fn.snap_start_optimization or '—' }}</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Environment Variable Keys -->
+{% if fn.env_var_keys %}
+{% set env_keys = fn.env_var_keys | fromjson %}
+{% if env_keys %}
+<div class="section-card">
+  <div class="section-title">Environment Variables
+    <span style="font-weight:400;color:#64748b;font-size:11px;margin-left:8px;">
+      ({{ env_keys | length }} key{{ 's' if env_keys | length != 1 else '' }} — values not stored)
+    </span>
+  </div>
+  <div>
+    {% for k in env_keys %}<span class="env-key">{{ k }}</span>{% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Layers -->
+{% if detail.layers %}
+<div class="section-card">
+  <div class="section-title">Layers ({{ detail.layers | length }})</div>
+  <table class="sum-table">
+    <thead>
+      <tr>
+        <th>Layer Name</th>
+        <th>Version</th>
+        <th style="text-align:right;">Code Size</th>
+        <th>ARN</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in detail.layers %}
+      <tr>
+        <td>{{ l.layer_name or '—' }}</td>
+        <td class="dim">{{ l.layer_version or '—' }}</td>
+        <td style="text-align:right;" class="dim">
+          {% if l.code_size %}
+            {% if l.code_size > 1048576 %}{{ (l.code_size / 1048576) | round(1) }} MB
+            {% else %}{{ (l.code_size / 1024) | round(1) }} KB{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td class="mono dim" style="font-size:11px;">{{ l.layer_arn }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Aliases -->
+{% if detail.aliases %}
+<div class="section-card">
+  <div class="section-title">Aliases ({{ detail.aliases | length }})</div>
+  <table class="sum-table">
+    <thead>
+      <tr>
+        <th>Alias</th>
+        <th>Version</th>
+        <th>Routing Config</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in detail.aliases %}
+      <tr>
+        <td style="font-weight:600;">{{ a.alias_name }}</td>
+        <td class="dim">{{ a.function_version or '—' }}</td>
+        <td class="mono dim" style="font-size:11px;">
+          {% if a.routing_config %}{{ a.routing_config }}{% else %}—{% endif %}
+        </td>
+        <td class="dim">{{ a.description or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- Event Source Mappings -->
+{% if detail.esms %}
+<div class="section-card">
+  <div class="section-title">Event Source Mappings ({{ detail.esms | length }})</div>
+  {% for esm in detail.esms %}
+  <div class="esm-row">
+    <span class="badge badge-{{ esm.event_source_type | lower if esm.event_source_type else 'other' }}">
+      {{ esm.event_source_type or 'UNKNOWN' }}
+    </span>
+    <span class="esm-source">{{ esm.event_source_arn or '—' }}</span>
+    <span class="dim" style="font-size:12px;">Batch: {{ esm.batch_size or '—' }}</span>
+    {% set es = (esm.state or '') | lower %}
+    <span class="badge {{ 'state-active' if es == 'enabled' else 'state-inactive' if es == 'disabled' else 'state-other' }}">
+      {{ esm.state or '—' }}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div style="margin-top:24px;">
+  <a href="/aws-inventory/lambda?q={{ query }}" class="clear-btn">← Back to Lambda</a>
+</div>
+
+{% else %}
+{# ══════════════════════════════════════════════════
+   LIST VIEW
+══════════════════════════════════════════════════ #}
+
+{% if error %}
+<div class="error-msg">⚠ {{ error }}</div>
+{% endif %}
+
+<div class="tab-bar">
+  <button class="tab-btn {% if active_tab == 'functions' %}active{% endif %}"
+          onclick="switchTab('functions')">⚡ Functions
+    {% if functions %}<span style="color:#475569;font-weight:400;margin-left:4px;">({{ functions | length }})</span>{% endif %}
+  </button>
+  <button class="tab-btn {% if active_tab == 'runtimes' %}active{% endif %}"
+          onclick="switchTab('runtimes')">🧩 By Runtime</button>
+  <button class="tab-btn {% if active_tab == 'accounts' %}active{% endif %}"
+          onclick="switchTab('accounts')">🏢 By Account</button>
+</div>
+
+<!-- ── Functions tab ─────────────────────────────────────────────────── -->
+<div id="tab-functions" class="tab-pane {% if active_tab == 'functions' %}active{% endif %}">
+
+  <form method="get" action="/aws-inventory/lambda">
+    <input type="hidden" name="tab" value="functions">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search function name, ARN, account…" autofocus>
+      <select name="runtime">
+        <option value="">All Runtimes</option>
+        {% for rt in runtimes %}
+        <option value="{{ rt }}" {% if rt == runtime_filter %}selected{% endif %}>{{ rt }}</option>
+        {% endfor %}
+      </select>
+      <select name="account">
+        <option value="">All Accounts</option>
+        {% for ac in accounts %}
+        <option value="{{ ac }}" {% if ac == account_filter %}selected{% endif %}>{{ ac }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Search</button>
+      {% if query or runtime_filter or account_filter %}
+      <a href="/aws-inventory/lambda" class="clear-btn">Clear</a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% if functions %}
+    {% for fn in functions %}
+    <div class="fn-card">
+      <div class="fn-card-header">
+        <div style="flex:1;min-width:0;">
+          <div class="fn-card-title">{{ fn.function_name }}</div>
+          <div class="fn-card-sub">{{ fn.function_arn }}</div>
+          {% if fn.description %}
+          <div style="font-size:12px;color:#64748b;margin-top:4px;">{{ fn.description | truncate(120) }}</div>
+          {% endif %}
+        </div>
+        <div class="fn-card-actions">
+          <a href="/aws-inventory/lambda?function_arn={{ fn.function_arn | urlencode }}&account={{ fn.account_name }}"
+             class="btn-detail">View Detail</a>
+        </div>
+      </div>
+      <div class="fn-card-meta">
+        <div class="fn-meta-item">
+          {% set st = (fn.state or 'Active') | lower %}
+          <span class="badge state-{{ st if st in ['active','inactive','failed','pending'] else 'other' }}">
+            {{ fn.state or 'Active' }}
+          </span>
+        </div>
+
+        <div class="fn-meta-item">
+          {% set rt = fn.runtime or '' %}
+          {% if fn.package_type == 'Image' %}
+            <span class="badge rt-container">Container</span>
+          {% elif 'python' in rt %}<span class="badge rt-python">{{ rt }}</span>
+          {% elif 'node' in rt %}<span class="badge rt-node">{{ rt }}</span>
+          {% elif 'java' in rt %}<span class="badge rt-java">{{ rt }}</span>
+          {% elif 'go' in rt %}<span class="badge rt-go">{{ rt }}</span>
+          {% elif 'ruby' in rt %}<span class="badge rt-ruby">{{ rt }}</span>
+          {% elif 'dotnet' in rt %}<span class="badge rt-dotnet">{{ rt }}</span>
+          {% elif 'provided' in rt %}<span class="badge rt-custom">{{ rt }}</span>
+          {% elif rt %}<span class="badge rt-other">{{ rt }}</span>
+          {% else %}<span class="badge rt-other">Unknown</span>
+          {% endif %}
+        </div>
+
+        {% if fn.architecture %}
+        <div class="fn-meta-item">
+          <span class="badge {{ 'arch-arm' if 'arm' in fn.architecture else 'arch-x86' }}">
+            {{ fn.architecture }}
+          </span>
+        </div>
+        {% endif %}
+
+        <div class="fn-meta-item">Account: <span>{{ fn.account_name }}</span></div>
+        <div class="fn-meta-item">Region: <span>{{ fn.region }}</span></div>
+        <div class="fn-meta-item">Memory: <span>{{ fn.memory_mb or '—' }} MB</span></div>
+        <div class="fn-meta-item">Timeout: <span>{{ fn.timeout_sec or '—' }}s</span></div>
+
+        {% if fn.code_size %}
+        <div class="fn-meta-item">Code:
+          <span>
+            {% if fn.code_size > 1048576 %}{{ (fn.code_size / 1048576) | round(1) }} MB
+            {% else %}{{ (fn.code_size / 1024) | round(1) }} KB{% endif %}
+          </span>
+        </div>
+        {% endif %}
+
+        {% if fn.vpc_id %}
+        <div class="fn-meta-item"><span class="chip vpc">VPC: {{ fn.vpc_id }}</span></div>
+        {% endif %}
+
+        {% if fn.layer_count and fn.layer_count > 0 %}
+        <div class="fn-meta-item">Layers: <span>{{ fn.layer_count }}</span></div>
+        {% endif %}
+
+        {% if fn.env_var_count and fn.env_var_count > 0 %}
+        <div class="fn-meta-item">Env Vars: <span>{{ fn.env_var_count }}</span></div>
+        {% endif %}
+
+        {% if fn.reserved_concurrency is not none and fn.reserved_concurrency != '' %}
+        <div class="fn-meta-item">
+          Reserved:
+          {% if fn.reserved_concurrency == 0 %}
+            <span style="color:#fca5a5;">THROTTLED (0)</span>
+          {% else %}
+            <span>{{ fn.reserved_concurrency }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if fn.last_update_status and fn.last_update_status != 'Successful' %}
+        <div class="fn-meta-item">
+          Update: <span style="color:#fca5a5;">{{ fn.last_update_status }}</span>
+        </div>
+        {% endif %}
+
+        {% if fn.modified_at %}
+        <div class="fn-meta-item">Modified: <span>{{ fn.modified_at }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if functions | length >= 500 %}
+    <div style="text-align:center;padding:16px;color:#475569;font-size:13px;">
+      Showing first 500 results — use search/filters to narrow results.
+    </div>
+    {% endif %}
+
+  {% else %}
+    <div class="no-results">
+      {% if query or runtime_filter or account_filter %}
+        No functions matched your search.
+      {% else %}
+        No Lambda functions found — run <code>collect_lambda.py</code> to populate.
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- ── By Runtime tab ────────────────────────────────────────────────── -->
+<div id="tab-runtimes" class="tab-pane {% if active_tab == 'runtimes' %}active{% endif %}">
+  {% if runtime_summary %}
+    {% set max_count = runtime_summary[0].fn_count %}
+    <div class="section-card">
+      <div class="section-title">Function Count by Runtime</div>
+      <table class="sum-table">
+        <thead>
+          <tr>
+            <th>Runtime</th>
+            <th style="text-align:right;">Functions</th>
+            <th style="min-width:200px;">Distribution</th>
+            <th style="text-align:right;">Avg Memory</th>
+            <th style="text-align:right;">Total Code</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in runtime_summary %}
+          <tr>
+            <td>
+              {% set rt = row.runtime %}
+              {% if 'python' in rt %}<span class="badge rt-python">{{ rt }}</span>
+              {% elif 'node' in rt %}<span class="badge rt-node">{{ rt }}</span>
+              {% elif 'java' in rt %}<span class="badge rt-java">{{ rt }}</span>
+              {% elif 'go' in rt %}<span class="badge rt-go">{{ rt }}</span>
+              {% elif 'ruby' in rt %}<span class="badge rt-ruby">{{ rt }}</span>
+              {% elif 'dotnet' in rt %}<span class="badge rt-dotnet">{{ rt }}</span>
+              {% elif 'provided' in rt %}<span class="badge rt-custom">{{ rt }}</span>
+              {% elif 'container' in rt %}<span class="badge rt-container">{{ rt }}</span>
+              {% else %}<span class="badge rt-other">{{ rt }}</span>
+              {% endif %}
+            </td>
+            <td class="num">{{ row.fn_count }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="rt-bar-wrap">
+                  <div class="rt-bar-fill"
+                       style="width:{{ ((row.fn_count / max_count) * 100) | round(0) }}%"></div>
+                </div>
+                <span style="font-size:11px;color:#475569;">
+                  {{ ((row.fn_count / runtime_summary | sum(attribute='fn_count')) * 100) | round(1) }}%
+                </span>
+              </div>
+            </td>
+            <td class="num dim">{{ row.avg_memory_mb | round(0) | int }} MB</td>
+            <td class="num dim">
+              {% if row.total_code_bytes %}
+                {% if row.total_code_bytes > 1073741824 %}{{ (row.total_code_bytes / 1073741824) | round(1) }} GB
+                {% else %}{{ (row.total_code_bytes / 1048576) | round(1) }} MB{% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="no-results">No runtime data — run <code>collect_lambda.py</code> first.</div>
+  {% endif %}
+</div>
+
+<!-- ── By Account tab ────────────────────────────────────────────────── -->
+<div id="tab-accounts" class="tab-pane {% if active_tab == 'accounts' %}active{% endif %}">
+  {% if account_summary %}
+    <div class="section-card">
+      <div class="section-title">Function Count by Account</div>
+      <table class="sum-table">
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th style="text-align:right;">Functions</th>
+            <th style="text-align:right;">Regions</th>
+            <th style="text-align:right;">In VPC</th>
+            <th style="text-align:right;">Reserved Concurrency</th>
+            <th>Last Seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in account_summary %}
+          <tr>
+            <td style="font-weight:600;">
+              <a href="/aws-inventory/lambda?account={{ row.account_name }}"
+                 style="color:#7dd3fc;text-decoration:none;">{{ row.account_name }}</a>
+            </td>
+            <td class="num">{{ row.fn_count }}</td>
+            <td class="num dim">{{ row.region_count }}</td>
+            <td class="num dim">{{ row.vpc_count }}</td>
+            <td class="num dim">{{ row.reserved_count }}</td>
+            <td class="dim">{{ row.last_seen }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="no-results">No account data — run <code>collect_lambda.py</code> first.</div>
+  {% endif %}
+</div>
+
+{% endif %}{# end list/detail #}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const pane = document.getElementById('tab-' + name);
+  if (pane) pane.classList.add('active');
+  event.currentTarget.classList.add('active');
+  // Update URL without reload
+  const url = new URL(window.location);
+  url.searchParams.set('tab', name);
+  history.replaceState(null, '', url);
+}
+
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+
+  document.body.appendChild(pop);
+
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.tag-popover').forEach(p => p.remove());
+});
+</script>
+{% endblock %}

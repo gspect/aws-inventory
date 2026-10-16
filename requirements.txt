@@ -1,0 +1,5 @@
+flask
+authlib
+requests
+boto3
+mysql-connector-python

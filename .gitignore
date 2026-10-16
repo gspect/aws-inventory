@@ -1,0 +1,9 @@
+config.ini
+__pycache__/
+*.pyc
+*.pyo
+*.log
+venv/
+.idea/
+scripts/cron-logs/
+.DS_Store

@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+{% block title %}ECS{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Tabs ── */
+  .tab-bar { display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid #2d3148; padding-bottom:0; }
+  .tab-btn { padding:8px 18px; font-size:13px; font-weight:600; border-radius:8px 8px 0 0;
+             border:1px solid transparent; border-bottom:none; cursor:pointer;
+             color:#64748b; background:transparent; transition:all .15s; }
+  .tab-btn:hover { color:#cbd5e1; background:#1a1d27; }
+  .tab-btn.active { color:#f1f5f9; background:#141722; border-color:#2d3148; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Search ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Cards ── */
+  .ecs-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+              padding:16px 20px; margin-bottom:10px;
+              transition:border-color .15s, background .15s; }
+  .ecs-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .ecs-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .ecs-card-title  { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .ecs-card-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px; }
+  .ecs-card-meta   { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .ecs-meta-item   { font-size:12px; color:#64748b; }
+  .ecs-meta-item span { color:#cbd5e1; }
+  .ecs-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Status badges ── */
+  .status-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .status-active   { background:#14352a; color:#6ee7b7; }
+  .status-inactive { background:#2a1010; color:#fca5a5; }
+  .status-draining { background:#2a2010; color:#fcd34d; }
+  .status-other    { background:#1e2130; color:#94a3b8; }
+
+  /* ── Launch type badge ── */
+  .launch-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .launch-fargate { background:#1e2040; color:#a5b4fc; }
+  .launch-ec2     { background:#2a1f0a; color:#fb923c; }
+  .launch-other   { background:#1e2130; color:#94a3b8; }
+
+  /* ── Task count chips ── */
+  .task-counts { display:flex; gap:6px; align-items:center; }
+  .task-chip { padding:2px 8px; border-radius:5px; font-size:11px; font-weight:700; }
+  .task-running  { background:#14352a; color:#6ee7b7; }
+  .task-pending  { background:#2a2010; color:#fcd34d; }
+  .task-desired  { background:#1e2130; color:#94a3b8; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:4px; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:220px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Service rows in cluster detail ── */
+  .svc-row { display:flex; align-items:center; gap:12px; padding:10px 0;
+             border-bottom:1px solid #1e2130; flex-wrap:wrap; }
+  .svc-row:last-child { border-bottom:none; }
+  .svc-name { font-size:13px; font-weight:600; color:#f1f5f9; flex:1; min-width:140px; }
+  .svc-link { color:#7dd3fc; text-decoration:none; font-size:12px; white-space:nowrap; }
+  .svc-link:hover { text-decoration:underline; }
+
+  /* ── Container table ── */
+  .ctr-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ctr-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase;
+                  letter-spacing:.5px; color:#475569; padding:0 12px 10px 0;
+                  border-bottom:1px solid #1e2130; }
+  .ctr-table td { padding:9px 12px 9px 0; border-bottom:1px solid #1e2130;
+                  color:#cbd5e1; vertical-align:top; }
+  .ctr-table tr:last-child td { border-bottom:none; }
+  .ctr-table td.mono { font-family:monospace; font-size:12px; }
+  .ctr-table td.dim  { color:#475569; font-size:12px; }
+
+  /* ── LB chip ── */
+  .lb-chip { display:inline-block; padding:3px 10px; margin:2px 4px 2px 0;
+             background:#1a2a3a; border:1px solid #1e4060; border-radius:6px;
+             font-size:12px; font-family:monospace; color:#7dd3fc; }
+
+  /* ── SG/Subnet chips ── */
+  .net-chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0;
+              background:#1a1d27; border:1px solid #2d3148; border-radius:5px;
+              font-size:11px; font-family:monospace; color:#94a3b8; }
+
+  .bool-yes { color:#6ee7b7; font-weight:600; }
+  .bool-no  { color:#475569; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('ecs_clusters', 0) }}</span><span class="stat-lbl">Clusters</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('ecs_services', 0) }}</span><span class="stat-lbl">Services</span></div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════
+     SERVICE DETAIL
+════════════════════════════════════════════════════ -->
+{% if view == 'service_detail' and detail %}
+{% set s = detail.service %}
+{% set td = detail.task_def %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/ecs">ECS</a>
+  <span>›</span>
+  <a href="/aws-inventory/ecs?cluster_arn={{ s.cluster_arn }}&account={{ s.account_name }}{% if query %}&q={{ query }}{% endif %}">
+    {{ s.cluster_name or 'Cluster' }}
+  </a>
+  <span>›</span>
+  {{ s.service_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ s.service_name }}</div>
+    {% set sc = s.status | lower %}
+    <span class="status-badge status-{{ sc if sc in ['active','inactive','draining'] else 'other' }}">
+      {{ s.status }}
+    </span>
+    {% if s.launch_type %}
+    <span class="launch-badge launch-{{ s.launch_type | lower if s.launch_type | lower in ['fargate','ec2'] else 'other' }}">
+      {{ s.launch_type }}
+    </span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ s.service_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ s.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ s.region }}</span></div>
+    <div class="detail-meta-item">Cluster: <span>{{ s.cluster_name }}</span></div>
+    <div class="detail-meta-item">Desired: <span>{{ s.desired_count }}</span></div>
+    <div class="detail-meta-item">Running: <span>{{ s.running_count }}</span></div>
+    {% if s.pending_count > 0 %}
+    <div class="detail-meta-item">Pending: <span style="color:#fcd34d;">{{ s.pending_count }}</span></div>
+    {% endif %}
+    {% if s.created_at %}
+    <div class="detail-meta-item">Created: <span>{{ s.created_at.strftime('%Y-%m-%d') }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Service Configuration -->
+<div class="section-card">
+  <div class="section-title">Service Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">Scheduling Strategy</div>
+    <div class="kv-value">{{ s.scheduling_strategy or '—' }}</div>
+    <div class="kv-label">Deployment Controller</div>
+    <div class="kv-value">{{ s.deployment_controller or 'ECS' }}</div>
+    {% if s.platform_family %}
+    <div class="kv-label">Platform Family</div>
+    <div class="kv-value">{{ s.platform_family }}</div>
+    {% endif %}
+    {% if s.platform_version %}
+    <div class="kv-label">Platform Version</div>
+    <div class="kv-value">{{ s.platform_version }}</div>
+    {% endif %}
+    {% if s.health_check_grace %}
+    <div class="kv-label">Health Check Grace</div>
+    <div class="kv-value">{{ s.health_check_grace }}s</div>
+    {% endif %}
+    {% if s.assign_public_ip %}
+    <div class="kv-label">Assign Public IP</div>
+    <div class="kv-value">{{ s.assign_public_ip }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Load Balancers -->
+{% set lbs = s.load_balancers | fromjson if s.load_balancers else [] %}
+{% if lbs %}
+<div class="section-card">
+  <div class="section-title">Load Balancers ({{ lbs | length }})</div>
+  {% for lb in lbs %}
+  <div style="background:#0f1117;border:1px solid #1e2130;border-radius:8px;padding:12px 16px;margin-bottom:8px;">
+    <div class="kv-grid">
+      {% if lb.name %}
+      <div class="kv-label">Name</div>
+      <div class="kv-value">{{ lb.name }}</div>
+      {% endif %}
+      {% if lb.target_group %}
+      <div class="kv-label">Target Group ARN</div>
+      <div class="kv-value" style="font-size:11px;">{{ lb.target_group }}</div>
+      {% endif %}
+      <div class="kv-label">Container</div>
+      <div class="kv-value">{{ lb.container_name }}{% if lb.container_port %} :{{ lb.container_port }}{% endif %}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Network -->
+{% set subnets = s.subnets | fromjson if s.subnets else [] %}
+{% set sgs = s.security_groups | fromjson if s.security_groups else [] %}
+{% if subnets or sgs %}
+<div class="section-card">
+  <div class="section-title">Network</div>
+  {% if subnets %}
+  <div style="margin-bottom:10px;">
+    <div class="kv-label" style="margin-bottom:6px;">Subnets</div>
+    {% for sn in subnets %}<span class="net-chip">{{ sn }}</span>{% endfor %}
+  </div>
+  {% endif %}
+  {% if sgs %}
+  <div>
+    <div class="kv-label" style="margin-bottom:6px;">Security Groups</div>
+    {% for sg in sgs %}<span class="net-chip">{{ sg }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Task Definition -->
+{% if td %}
+<div class="section-card">
+  <div class="section-title">Task Definition — {{ td.family }}:{{ td.revision }}</div>
+  <div class="kv-grid" style="margin-bottom:18px;">
+    <div class="kv-label">Network Mode</div>
+    <div class="kv-value">{{ td.network_mode or '—' }}</div>
+    <div class="kv-label">CPU</div>
+    <div class="kv-value">{{ td.cpu or '—' }}</div>
+    <div class="kv-label">Memory</div>
+    <div class="kv-value">{{ td.memory or '—' }}</div>
+    <div class="kv-label">Requires Compat.</div>
+    <div class="kv-value">{{ td.requires_compat or '—' }}</div>
+    {% if td.task_role_arn %}
+    <div class="kv-label">Task Role</div>
+    <div class="kv-value" style="font-size:11px;">{{ td.task_role_arn }}</div>
+    {% endif %}
+    {% if td.execution_role_arn %}
+    <div class="kv-label">Execution Role</div>
+    <div class="kv-value" style="font-size:11px;">{{ td.execution_role_arn }}</div>
+    {% endif %}
+    {% if td.registered_at %}
+    <div class="kv-label">Registered</div>
+    <div class="kv-value">{{ td.registered_at.strftime('%Y-%m-%d %H:%M') }}</div>
+    {% endif %}
+  </div>
+
+  {% set containers = td.containers | fromjson if td.containers else [] %}
+  {% if containers %}
+  <div class="section-title" style="margin-top:4px;">Containers ({{ containers | length }})</div>
+  <table class="ctr-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Image</th>
+        <th>CPU</th>
+        <th>Memory</th>
+        <th>Ports</th>
+        <th>Log Driver</th>
+        <th>Env / Secrets</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in containers %}
+      <tr>
+        <td style="font-weight:600;color:#f1f5f9;">{{ c.name }}</td>
+        <td class="mono" style="font-size:11px;max-width:260px;word-break:break-all;">{{ c.image }}</td>
+        <td class="dim">{{ c.cpu or '—' }}</td>
+        <td class="dim">{{ c.memory or '—' }}</td>
+        <td class="dim">
+          {% for p in c.ports %}
+          <span class="net-chip">{{ p.container }}{% if p.host and p.host != p.container %}/{{ p.host }}{% endif %} {{ p.protocol }}</span>
+          {% else %}—
+          {% endfor %}
+        </td>
+        <td class="dim">{{ c.log_driver or '—' }}</td>
+        <td class="dim">
+          {% if c.env_count %}{{ c.env_count }} env{% endif %}
+          {% if c.secrets_count %} {{ c.secrets_count }} secrets{% endif %}
+          {% if not c.env_count and not c.secrets_count %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% elif s.task_definition %}
+<div class="section-card">
+  <div class="section-title">Task Definition</div>
+  <div class="kv-grid">
+    <div class="kv-label">ARN</div>
+    <div class="kv-value">{{ s.task_definition }}</div>
+  </div>
+  <p style="color:#475569;font-size:12px;margin-top:10px;">
+    Full task definition details not yet collected — re-run collect_ecs.py.
+  </p>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     CLUSTER DETAIL
+════════════════════════════════════════════════════ -->
+{% elif view == 'cluster_detail' and detail %}
+{% set c = detail.cluster %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/ecs">ECS</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/ecs?q={{ query }}">Results</a><span>›</span>{% endif %}
+  {{ c.cluster_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ c.cluster_name }}</div>
+    {% set sc = c.status | lower %}
+    <span class="status-badge status-{{ sc if sc in ['active','inactive'] else 'other' }}">
+      {{ c.status }}
+    </span>
+    {% if c.container_insights == 'enabled' %}
+    <span style="background:#1e2a14;color:#86efac;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">Container Insights</span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ c.cluster_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ c.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ c.region }}</span></div>
+    <div class="detail-meta-item">Active Services: <span>{{ c.active_services }}</span></div>
+    <div class="detail-meta-item">Running Tasks: <span>{{ c.running_tasks }}</span></div>
+    {% if c.pending_tasks > 0 %}
+    <div class="detail-meta-item">Pending Tasks: <span style="color:#fcd34d;">{{ c.pending_tasks }}</span></div>
+    {% endif %}
+    {% if c.registered_container_instances > 0 %}
+    <div class="detail-meta-item">Container Instances: <span>{{ c.registered_container_instances }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Services -->
+<div class="section-card">
+  <div class="section-title">Services ({{ detail.services | length }})</div>
+  {% if detail.services %}
+  {% for s in detail.services %}
+  {% set sc = s.status | lower %}
+  <div class="svc-row">
+    <div>
+      <div class="svc-name">{{ s.service_name }}</div>
+      {% if s.task_definition %}
+      <div style="font-size:11px;color:#475569;font-family:monospace;margin-top:2px;">
+        {{ s.task_definition.split('/')[-1] if '/' in s.task_definition else s.task_definition }}
+      </div>
+      {% endif %}
+    </div>
+    <span class="status-badge status-{{ sc if sc in ['active','inactive','draining'] else 'other' }}">{{ s.status }}</span>
+    {% if s.launch_type %}
+    <span class="launch-badge launch-{{ s.launch_type | lower if s.launch_type | lower in ['fargate','ec2'] else 'other' }}">{{ s.launch_type }}</span>
+    {% endif %}
+    <div class="task-counts">
+      <span class="task-chip task-running">▶ {{ s.running_count }}</span>
+      {% if s.pending_count > 0 %}
+      <span class="task-chip task-pending">⏳ {{ s.pending_count }}</span>
+      {% endif %}
+      <span class="task-chip task-desired">/ {{ s.desired_count }}</span>
+    </div>
+    <a class="svc-link" href="/aws-inventory/ecs?service_arn={{ s.service_arn }}&account={{ c.account_name }}">
+      Details →
+    </a>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="color:#475569;font-size:13px;padding:12px 0;">No services in this cluster.</div>
+  {% endif %}
+</div>
+
+{% if detail.tags %}
+<div class="section-card">
+  <div class="section-title">Tags ({{ detail.tags | length }})</div>
+  <div class="kv-grid">
+    {% for tag in detail.tags %}
+    <div class="kv-label">{{ tag.k }}</div>
+    <div class="kv-value">{{ tag.v or '—' }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+{% if error %}
+<div class="error-msg">{{ error }}</div>
+{% endif %}
+
+<div class="tab-bar">
+  <button class="tab-btn {% if active_tab == 'clusters' %}active{% endif %}"
+          onclick="switchTab('clusters', event)">Clusters</button>
+  <button class="tab-btn {% if active_tab == 'services' %}active{% endif %}"
+          onclick="switchTab('services', event)">Services</button>
+</div>
+
+<!-- ── Clusters Tab ── -->
+<div id="tab-clusters" class="tab-pane {% if active_tab == 'clusters' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/ecs">
+    <input type="hidden" name="tab" value="clusters">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search cluster name, account, region…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if clusters %}
+    {% for c in clusters %}
+    {% set sc = c.status | lower %}
+    <div class="ecs-card">
+      <div class="ecs-card-header">
+        <div style="flex:1;min-width:0;">
+          <div class="ecs-card-title">{{ c.cluster_name }}</div>
+          <div class="ecs-card-sub">{{ c.cluster_arn }}</div>
+        </div>
+        <span class="status-badge status-{{ sc if sc in ['active','inactive'] else 'other' }}">{{ c.status }}</span>
+        {% if c.container_insights == 'enabled' %}
+        <span style="background:#1e2a14;color:#86efac;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">Insights</span>
+        {% endif %}
+        <div class="ecs-card-actions">
+          <a class="btn-detail"
+             href="/aws-inventory/ecs?cluster_arn={{ c.cluster_arn }}&account={{ c.account_name }}{% if query %}&q={{ query }}{% endif %}">
+            Details →
+          </a>
+        </div>
+      </div>
+      <div class="ecs-card-meta">
+        <div class="ecs-meta-item">Account: <span>{{ c.account_name }}</span></div>
+        <div class="ecs-meta-item">Region: <span>{{ c.region }}</span></div>
+        <div class="ecs-meta-item">Active Services: <span>{{ c.active_services }}</span></div>
+        <div class="ecs-meta-item">Running Tasks: <span>{{ c.running_tasks }}</span></div>
+        {% if c.pending_tasks > 0 %}
+        <div class="ecs-meta-item">Pending Tasks: <span style="color:#fcd34d;">{{ c.pending_tasks }}</span></div>
+        {% endif %}
+        {% if c.registered_container_instances > 0 %}
+        <div class="ecs-meta-item">EC2 Instances: <span>{{ c.registered_container_instances }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No clusters found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No ECS clusters found. Add <code>ecs_collect = true</code> to accounts in config.ini and run collect_ecs.py.</div>
+  {% endif %}
+</div>
+
+<!-- ── Services Tab ── -->
+<div id="tab-services" class="tab-pane {% if active_tab == 'services' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/ecs">
+    <input type="hidden" name="tab" value="services">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}"
+             placeholder="Search service name, cluster, account, task definition…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if services %}
+    {% for s in services %}
+    {% set sc = s.status | lower %}
+    <div class="ecs-card">
+      <div class="ecs-card-header">
+        <div style="flex:1;min-width:0;">
+          <div class="ecs-card-title">{{ s.service_name }}</div>
+          <div class="ecs-card-sub">{{ s.cluster_name }} — {{ s.region }}</div>
+        </div>
+        <span class="status-badge status-{{ sc if sc in ['active','inactive','draining'] else 'other' }}">{{ s.status }}</span>
+        {% if s.launch_type %}
+        <span class="launch-badge launch-{{ s.launch_type | lower if s.launch_type | lower in ['fargate','ec2'] else 'other' }}">
+          {{ s.launch_type }}
+        </span>
+        {% endif %}
+        <div class="task-counts">
+          <span class="task-chip task-running">▶ {{ s.running_count }}</span>
+          {% if s.pending_count > 0 %}
+          <span class="task-chip task-pending">⏳ {{ s.pending_count }}</span>
+          {% endif %}
+          <span class="task-chip task-desired">/ {{ s.desired_count }}</span>
+        </div>
+        <div class="ecs-card-actions">
+          <a class="btn-detail"
+             href="/aws-inventory/ecs?service_arn={{ s.service_arn }}&account={{ s.account_name }}{% if query %}&q={{ query }}{% endif %}">
+            Details →
+          </a>
+        </div>
+      </div>
+      <div class="ecs-card-meta">
+        <div class="ecs-meta-item">Account: <span>{{ s.account_name }}</span></div>
+        <div class="ecs-meta-item">Cluster: <span>{{ s.cluster_name }}</span></div>
+        {% if s.task_definition %}
+        <div class="ecs-meta-item">Task Def: <span>
+          {{ s.task_definition.split('/')[-1] if '/' in s.task_definition else s.task_definition }}
+        </span></div>
+        {% endif %}
+        {% if s.platform_family %}
+        <div class="ecs-meta-item">Platform: <span>{{ s.platform_family }}</span></div>
+        {% endif %}
+        <div class="ecs-meta-item">Controller: <span>{{ s.deployment_controller or 'ECS' }}</span></div>
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No services found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No ECS services found.</div>
+  {% endif %}
+</div>
+
+<script>
+function switchTab(tab, event) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.tag-popover').forEach(function(p) { p.remove(); });
+});
+</script>
+{% endblock %}

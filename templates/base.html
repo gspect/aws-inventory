@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}AWS Inventory{% endblock %} </title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { overflow-x: hidden; max-width: 100%; }
+
+    /* ── Site Header ── */
+    .site-header {
+      background: #1a1d27;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      min-height: 56px;
+      margin-bottom: 0;
+      width: 100%;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      padding: 10px 0;
+    }
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-logo { font-size: 20px; }
+    .header-brand {
+      font-size: 16px;
+      font-weight: 700;
+      color: #FF9900;
+      text-decoration: none;
+      letter-spacing: -0.3px;
+    }
+    .header-brand:hover { color: #ffad33; }
+    .header-sub {
+      font-size: 11px;
+      color: #475569;
+      padding-left: 8px;
+      border-left: 1px solid #2d3148;
+    }
+
+    /* ── Nav links ── */
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .nav-link {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      color: #94a3b8;
+      background: transparent;
+      border: 1px solid transparent;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .nav-link:hover { color: #f1f5f9; background: #242840; border-color: #2d3148; }
+    .nav-link.active { color: #FF9900; background: #2a1f0a; border-color: #FF9900; }
+
+    /* ── Header right ── */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 10px 0;
+    }
+    .header-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      transition: background .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .header-link.source     { color: #fc6d26; background: #1f1208; border-color: #fc6d2640; }
+    .header-link.source:hover { background: #2a1a0a; border-color: #fc6d26; }
+    .header-link.confluence { color: #2684ff; background: #08101f; border-color: #2684ff40; }
+    .header-link.confluence:hover { background: #0a1628; border-color: #2684ff; }
+
+    /* ── Stat bar ── */
+    .stat-bar {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      background: #141722;
+      border-bottom: 1px solid #2d3148;
+      padding: 10px 24px;
+      flex-wrap: wrap;
+    }
+    .stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 0 20px;
+      border-right: 1px solid #2d3148;
+    }
+    .stat:first-child { padding-left: 0; }
+    .stat.sync {
+      margin-left: auto;
+      align-items: flex-end;
+      border-right: none;
+      padding-right: 0;
+    }
+    .stat-num {
+      font-size: 18px !important;
+      font-weight: 700 !important;
+      color: #FF9900 !important;
+      line-height: 1 !important;
+    }
+    .stat-num.small { font-size: 12px !important; color: #64748b !important; font-weight: 400 !important; }
+    .stat-lbl { font-size: 10px !important; color: #64748b !important; text-transform: uppercase !important; letter-spacing: 0.5px !important; }
+
+    /* ── FAB (Feedback button) ── */
+    .fab {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 1000;
+      background: #1e3a5f;
+      color: #93c5fd;
+      border: 1px solid #1e4976;
+      border-radius: 50px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 16px #0008;
+      transition: background .15s;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .fab:hover { background: #1e4976; }
+
+    /* ── Feedback modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: #000a;
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #141722;
+      border: 1px solid #2d3148;
+      border-radius: 14px;
+      padding: 28px 32px;
+      width: 480px;
+      max-width: 95vw;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+    .modal-sub   { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+    .modal-row   { margin-bottom: 16px; }
+    .modal-label { font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+    .modal-select, .modal-input, .modal-textarea {
+      width: 100%; padding: 9px 13px;
+      background: #0f1117; border: 1px solid #2d3148;
+      border-radius: 8px; color: #f1f5f9; font-size: 13px;
+      font-family: inherit;
+    }
+    .modal-select:focus, .modal-input:focus, .modal-textarea:focus {
+      outline: none; border-color: #3d4468;
+    }
+    .modal-textarea { resize: vertical; min-height: 90px; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; }
+    .modal-btn-cancel {
+      padding: 8px 18px; background: transparent; color: #64748b;
+      border: 1px solid #2d3148; border-radius: 8px; font-size: 13px;
+      cursor: pointer; transition: background .15s;
+    }
+    .modal-btn-cancel:hover { background: #1a1d27; }
+    .modal-btn-submit {
+      padding: 8px 20px; background: #1e3a5f; color: #93c5fd;
+      border: 1px solid #1e4976; border-radius: 8px; font-size: 13px;
+      font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: background .15s;
+    }
+    .modal-btn-submit:hover { background: #1e4976; }
+
+    /* ── Tags popover ── */
+    .tags-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; background: #1a2a3a; border: 1px solid #1e4060;
+      border-radius: 6px; font-size: 12px; color: #7dd3fc; cursor: pointer;
+      transition: background .15s;
+    }
+    .tags-pill:hover { background: #1e3a5f; }
+    .tag-popover {
+      position: fixed; z-index: 999;
+      background: #141722; border: 1px solid #2d3148;
+      border-radius: 10px; padding: 14px 16px;
+      min-width: 240px; max-width: 360px;
+      box-shadow: 0 8px 32px #0009;
+    }
+    .tag-popover-title { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: .5px; color: #475569; margin-bottom: 10px; }
+    .tag-row { display: flex; gap: 8px; padding: 5px 0;
+               border-bottom: 1px solid #1e2130; font-size: 12px; }
+    .tag-row:last-child { border-bottom: none; }
+    .tag-key { color: #94a3b8; min-width: 90px; flex-shrink: 0; }
+    .tag-val { color: #cbd5e1; word-break: break-all; }
+
+    /* ── Wrapper & footer ── */
+    .wrapper { max-width: 1400px; margin: 0 auto; padding: 32px 24px 80px; }
+    .site-footer {
+      border-top: 1px solid #2d3148;
+      margin-top: 48px; padding: 20px 24px;
+      text-align: center; color: #475569; font-size: 12px;
+    }
+    .site-footer a { color: #64748b; text-decoration: none; margin: 0 6px; transition: color .15s; }
+    .site-footer a:hover { color: #94a3b8; }
+
+    .mono { font-family: monospace; }
+  </style>
+  {% block head %}{% endblock %}
+<script>
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="header-left">
+    <div class="header-title">
+      <span class="header-logo">☁</span>
+      <a href="/aws-inventory/" class="header-brand">AWS Inventory</a>
+      <span class="header-sub">Multi-Account Search</span>
+    </div>
+    <nav class="header-nav">
+      <a href="/aws-inventory/"
+         class="nav-link {% if active_page == 'resources' %}active{% endif %}">🖥 Resources &amp; DNS</a>
+      <a href="/aws-inventory/sg"
+         class="nav-link {% if active_page == 'sg' %}active{% endif %}">🔒 Security Groups</a>
+      <a href="/aws-inventory/iam"
+         class="nav-link {% if active_page == 'iam' %}active{% endif %}">👤 IAM</a>
+      <a href="/aws-inventory/network"
+         class="nav-link {% if active_page == 'network' %}active{% endif %}">🌐 Network</a>
+      <a href="/aws-inventory/sso"
+         class="nav-link {% if active_page == 'sso' %}active{% endif %}">🏢 Identity Center</a>
+      <a href="/aws-inventory/rds"
+         class="nav-link {% if active_page == 'rds' %}active{% endif %}">🗄 Databases</a>
+      <a href="/aws-inventory/messaging"
+         class="nav-link {% if active_page == 'messaging' %}active{% endif %}">📨 Messaging</a>
+      <a href="/aws-inventory/s3"
+         class="nav-link {% if active_page == 's3' %}active{% endif %}">🪣 S3</a>
+      <a href="/aws-inventory/efs"
+         class="nav-link {% if active_page == 'efs' %}active{% endif %}">📁 EFS</a>
+      <a href="/aws-inventory/ecs"
+         class="nav-link {% if active_page == 'ecs' %}active{% endif %}">🐳 ECS</a>
+      <a href="/aws-inventory/eks"
+         class="nav-link {% if active_page == 'eks' %}active{% endif %}">⎈ EKS</a>
+      <a href="/aws-inventory/cloudfront"
+         class="nav-link {% if active_page == 'cloudfront' %}active{% endif %}">🌍 CloudFront</a>
+      <a href="/aws-inventory/lambda"
+         class="nav-link {% if active_page == 'lambda' %}active{% endif %}">⚡ Lambda</a>
+    </nav>
+  </div>
+
+  <div class="header-right">
+    {% if project_url %}
+    <a href="{{ project_url }}" class="header-link source" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56v-2c-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.74.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 015.78 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.69 5.39-5.25 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.68.8.56A11.5 11.5 0 0023.5 12C23.5 5.65 18.35.5 12 .5z"/>
+      </svg>
+      Source
+    </a>
+    {% endif %}
+
+    {% if current_user %}
+    <span style="font-size:12px; color:#94a3b8; padding:6px 10px; background:#1a1d27; border:1px solid #2d3148; border-radius:8px;">
+      {{ current_user.name }}
+    </span>
+    <a href="/aws-inventory/auth/logout"
+       style="font-size:12px; color:#fca5a5; padding:6px 12px; background:#2a1a1a; border:1px solid #fca5a540; border-radius:8px; text-decoration:none;">
+      Logout
+    </a>
+    {% endif %}
+  </div>
+</header>
+
+<!-- ── Stat Bar ───────────────────────────────────────── -->
+<div class="stat-bar">
+  {% block stats %}
+  <div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.get('ec2', 0) }}</span><span class="stat-lbl">EC2</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.get('alb',0) + stats.get('nlb',0) + stats.get('clb',0) }}</span><span class="stat-lbl">Load Balancers</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.get('vpc', 0) }}</span><span class="stat-lbl">VPCs</span></div>
+  <div class="stat"><span class="stat-num">{{ stats.get('dns_records', 0) }}</span><span class="stat-lbl">DNS Records</span></div>
+  {% endblock %}
+  <div class="stat sync">
+    <span class="stat-lbl">Last Sync</span>
+    <span class="stat-num small">{{ stats.get('last_sync', 'Never') }}</span>
+  </div>
+</div>
+
+<!-- ── Page Content ───────────────────────────────────── -->
+<div class="wrapper">
+  {% if sync_script %}
+  <div class="sync-bar" id="syncBar">
+    <span class="sync-bar-label">⚡ Force Sync</span>
+    {% if sync_show_account_dropdown %}
+    <select class="sync-account-select" id="syncAccountSelect">
+      <option value="">All Accounts (~20 min)</option>
+    </select>
+    {% endif %}
+    <button class="sync-btn cooldown" id="syncBtn" onclick="triggerSync()" disabled>
+      <span id="syncBtnIcon">⏳</span>
+      <span id="syncBtnText">Checking…</span>
+    </button>
+    <span class="sync-status-text" id="syncStatusText"></span>
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</div>
+
+<!-- ── Footer ────────────────────────────────────────── -->
+<footer class="site-footer">
+  {% if project_url %}<a href="{{ project_url }}" target="_blank" rel="noopener">Source</a> · {% endif %}
+  AWS Inventory Tool
+</footer>
+
+<!-- ── Feedback FAB & Modal ───────────────────────────── -->
+<button class="fab" onclick="document.getElementById('feedbackModal').classList.add('open')">
+  💬 Feedback
+</button>
+
+<div class="modal-overlay" id="feedbackModal">
+  <div class="modal-box">
+    <div class="modal-title">Send Feedback</div>
+    <div class="modal-sub">Report a bug or request a feature — opens a pre-filled issue on the project repository.</div>
+    <div class="modal-row">
+      <div class="modal-label">Type</div>
+      <select class="modal-select" id="fbType">
+        <option value="bug">🐛 Bug Report</option>
+        <option value="feature">✨ Feature Request</option>
+        <option value="other">💬 Other</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <div class="modal-label">Title</div>
+      <input class="modal-input" id="fbTitle" type="text" placeholder="Short description…">
+    </div>
+    <div class="modal-row">
+      <div class="modal-label">Details</div>
+      <textarea class="modal-textarea" id="fbBody" placeholder="Steps to reproduce, expected vs actual behavior, etc."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn-cancel"
+              onclick="document.getElementById('feedbackModal').classList.remove('open')">
+        Cancel
+      </button>
+      <a class="modal-btn-submit" id="fbSubmit" href="#" target="_blank"
+         onclick="buildIssueUrl(); return true;">
+        Open Issue →
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Feedback modal ──
+function buildIssueUrl() {
+  const type  = document.getElementById('fbType').value;
+  const title = document.getElementById('fbTitle').value.trim();
+  const body  = document.getElementById('fbBody').value.trim();
+  const label = type === 'bug' ? 'bug' : type === 'feature' ? 'feature' : 'feedback';
+  const page  = window.location.pathname;
+  const full  = `${body}\n\n---\n_Page: ${page}_`;
+  const url   = `{{ project_url }}/issues/new`
+              + `?title=${encodeURIComponent(title)}`
+              + `&body=${encodeURIComponent(full)}`
+              + `&labels=${encodeURIComponent(label)}`;
+  document.getElementById('fbSubmit').href = url;
+}
+
+document.getElementById('feedbackModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+</script>
+
+<!-- ── Force Sync Component ───────────────────────────── -->
+{% if sync_script %}
+<style>
+  .sync-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #141722;
+    border: 1px solid #2d3148;
+    border-radius: 10px;
+    padding: 12px 18px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .sync-bar-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  .sync-account-select {
+    padding: 6px 10px;
+    background: #0f1117;
+    border: 1px solid #2d3148;
+    border-radius: 7px;
+    color: #f1f5f9;
+    font-size: 13px;
+    font-family: inherit;
+    min-width: 220px;
+    cursor: pointer;
+  }
+  .sync-account-select:focus { outline: none; border-color: #3d4468; }
+  .sync-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background .15s, border-color .15s, opacity .15s;
+    white-space: nowrap;
+  }
+  .sync-btn.ready {
+    background: #0f2d1a;
+    color: #4ade80;
+    border-color: #4ade8040;
+  }
+  .sync-btn.ready:hover { background: #0f3d1f; border-color: #4ade80; }
+  .sync-btn.running {
+    background: #1a1f0f;
+    color: #facc15;
+    border-color: #facc1540;
+    cursor: not-allowed;
+    opacity: 0.8;
+  }
+  .sync-btn.cooldown {
+    background: #1a1d27;
+    color: #475569;
+    border-color: #2d3148;
+    cursor: not-allowed;
+  }
+  .sync-btn.failed {
+    background: #2d0f0f;
+    color: #f87171;
+    border-color: #f8717140;
+    cursor: not-allowed;
+  }
+  .sync-status-text {
+    font-size: 12px;
+    color: #64748b;
+    white-space: nowrap;
+  }
+  .sync-status-text .by   { color: #94a3b8; }
+  .sync-status-text .ts   { color: #475569; }
+  .sync-status-text .warn { color: #f87171; }
+</style>
+
+<script>
+(function() {
+  const SCRIPT       = {{ sync_script | tojson }};
+  const SHOW_DROPDOWN = {{ (sync_show_account_dropdown | default(false)) | tojson }};
+  const BASE         = "/aws-inventory";
+  let   pollTimer    = null;
+
+  // ── Populate account dropdown ──────────────────────────
+  if (SHOW_DROPDOWN) {
+    fetch(`${BASE}/api/accounts`)
+      .then(r => r.json())
+      .then(data => {
+        const sel = document.getElementById('syncAccountSelect');
+        (data.accounts || []).forEach(name => {
+          const opt  = document.createElement('option');
+          opt.value  = name;
+          opt.text   = name;
+          sel.appendChild(opt);
+        });
+      })
+      .catch(() => {});
+  }
+
+  // ── Helpers ────────────────────────────────────────────
+  function selectedAccount() {
+    if (!SHOW_DROPDOWN) return null;
+    const val = document.getElementById('syncAccountSelect').value;
+    return val || null;
+  }
+
+  function fmtRemaining(secs) {
+    if (secs <= 0) return '';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return m > 0 ? `${m}m ${s}s` : `${s}s`;
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const diff = Math.floor((Date.now() - new Date(dateStr + ' UTC')) / 1000);
+    if (diff < 60)  return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+    return `${Math.floor(diff/3600)}h ago`;
+  }
+
+  // ── Render button state ────────────────────────────────
+  function renderState(data) {
+    const btn      = document.getElementById('syncBtn');
+    const btnIcon  = document.getElementById('syncBtnIcon');
+    const btnText  = document.getElementById('syncBtnText');
+    const statusEl = document.getElementById('syncStatusText');
+
+    // Clear classes
+    btn.classList.remove('ready', 'running', 'cooldown', 'failed');
+
+    const status    = data.status || 'never';
+    const triggeredBy = data.triggered_by || '';
+    const triggeredAt = data.triggered_at || '';
+    const finishedAt  = data.finished_at  || '';
+
+    if (status === 'running') {
+      btn.classList.add('running');
+      btn.disabled  = true;
+      btnIcon.textContent = '⏳';
+      btnText.textContent = 'Syncing…';
+      const ago = timeAgo(triggeredAt);
+      statusEl.innerHTML  = `<span class="by">Started by ${escHtml(triggeredBy)}</span> <span class="ts">${ago}</span>`;
+      schedulePoll(3000);
+
+    } else if (data.on_cooldown) {
+      btn.classList.add('cooldown');
+      btn.disabled  = true;
+      btnIcon.textContent = '🔒';
+      const rem = fmtRemaining(data.cooldown_remaining_secs);
+      btnText.textContent = rem ? `Available in ${rem}` : 'Cooldown';
+      const ago = finishedAt ? timeAgo(finishedAt) : timeAgo(triggeredAt);
+      statusEl.innerHTML  = `<span class="by">Last run by ${escHtml(triggeredBy)}</span> <span class="ts">${ago}</span>`;
+      // Re-check when cooldown expires
+      if (data.cooldown_remaining_secs > 0) {
+        schedulePoll((data.cooldown_remaining_secs + 2) * 1000);
+      }
+
+    } else if (status === 'failed') {
+      btn.classList.add('failed');
+      btn.disabled  = true;
+      btnIcon.textContent = '❌';
+      btnText.textContent = 'Last sync failed';
+      statusEl.innerHTML  = `<span class="warn">Failed — check /tmp/${SCRIPT}_*.log on the server</span>`;
+
+    } else {
+      // ready (never run, or done and cooldown expired)
+      btn.classList.add('ready');
+      btn.disabled  = false;
+      btnIcon.textContent = '🔄';
+      btnText.textContent = 'Sync Now';
+      if (status === 'never') {
+        statusEl.textContent = 'Never synced manually';
+      } else {
+        const ago = finishedAt ? timeAgo(finishedAt) : timeAgo(triggeredAt);
+        statusEl.innerHTML = `<span class="by">Last run by ${escHtml(triggeredBy)}</span> <span class="ts">${ago}</span>`;
+      }
+    }
+  }
+
+  // ── Poll status ────────────────────────────────────────
+  function schedulePoll(ms) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(fetchStatus, ms);
+  }
+
+  function fetchStatus() {
+    const acct   = selectedAccount();
+    const params = acct ? `?account_name=${encodeURIComponent(acct)}` : '';
+    fetch(`${BASE}/api/sync/status/${SCRIPT}${params}`)
+      .then(r => r.json())
+      .then(renderState)
+      .catch(() => schedulePoll(5000));
+  }
+
+  // ── Trigger sync ───────────────────────────────────────
+  window.triggerSync = function() {
+    const btn  = document.getElementById('syncBtn');
+    const acct = selectedAccount();
+    btn.disabled = true;
+
+    fetch(`${BASE}/api/sync/${SCRIPT}`, {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({ account_name: acct }),
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('syncStatusText').innerHTML =
+          `<span class="warn">${escHtml(data.error)}</span>`;
+        btn.disabled = false;
+      } else {
+        fetchStatus();
+      }
+    })
+    .catch(() => {
+      document.getElementById('syncStatusText').innerHTML =
+        '<span class="warn">Request failed — try again</span>';
+      btn.disabled = false;
+    });
+  };
+
+  // ── Re-fetch when account dropdown changes ─────────────
+  if (SHOW_DROPDOWN) {
+    document.getElementById('syncAccountSelect')
+      .addEventListener('change', () => {
+        clearTimeout(pollTimer);
+        fetchStatus();
+      });
+  }
+
+  // ── Initial load ───────────────────────────────────────
+  fetchStatus();
+})();
+</script>
+{% endif %}
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

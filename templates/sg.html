@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+{% block title %}Security Groups{% endblock %}
+
+{% block head %}
+<style>
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  .sg-card { background:#141722; border:1px solid #2d3148; border-radius:10px; padding:20px 24px; margin-bottom:12px; transition:border-color .15s, background .15s; }
+  .sg-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .sg-card-header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .sg-card-title { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .sg-card-meta { font-size:12px; color:#64748b; margin-top:4px; }
+  .sg-card-actions { margin-left:auto; }
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd; border:1px solid #1e4976; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  .direction-block { margin-bottom:24px; }
+  .direction-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; padding:6px 12px; border-radius:6px; display:inline-block; margin-bottom:12px; }
+  .dir-inbound  { background:#14352a; color:#6ee7b7; }
+  .dir-outbound { background:#1e2d4a; color:#93c5fd; }
+
+  .rule-row { display:grid; grid-template-columns:80px 120px 100px 1fr 1fr; gap:10px; align-items:center; padding:9px 14px; border-radius:7px; background:#1a1d27; margin-bottom:6px; font-size:13px; }
+  .rule-row-header { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; color:#475569; background:transparent !important; }
+  .rule-proto { font-family:monospace; color:#fde68a; }
+  .rule-ports { font-family:monospace; color:#e2e8f0; }
+  .port-all   { color:#64748b; font-style:italic; }
+  .rule-target { font-family:monospace; font-size:12px; color:#a5f3fc; word-break:break-all; }
+  .rule-target a { color:#7dd3fc; text-decoration:none; }
+  .rule-target a:hover { text-decoration:underline; }
+  .rule-desc  { font-size:12px; color:#64748b; }
+
+  .rule-type-badge { padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700; text-transform:uppercase; }
+  .rt-cidr { background:#1e2d4a; color:#93c5fd; }
+  .rt-sg   { background:#2a1e4a; color:#c4b5fd; }
+  .rt-pl   { background:#14352a; color:#6ee7b7; }
+
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px; padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:13px; color:#64748b; margin-top:4px; font-family:monospace; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .attachments-section { margin-top:32px; }
+  .no-attach { color:#475569; font-size:13px; font-style:italic; padding:10px 0; }
+
+  .rule-row-dupe { background: #1e1a0a !important; border-left: 3px solid #fbbf24; }
+  .rule-row-dupe:hover { background: #252010 !important; }
+  .sg-active-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 6px;
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    font-size: 11px; font-weight: 600; border: 1px solid;
+  }
+  [data-src-index="0"] { background:#1e1a3a; color:#c4b5fd; border-color:#3d2d6a60; }
+  [data-src-index="1"] { background:#1a2e3a; color:#7dd3fc; border-color:#1e4a6a60; }
+  [data-src-index="2"] { background:#1a3327; color:#6ee7b7; border-color:#1a4a3560; }
+  [data-src-index="3"] { background:#2a1f0a; color:#fbbf24; border-color:#4a3a1060; }
+  [data-src-index="4"] { background:#2a1a1a; color:#fca5a5; border-color:#5a202060; }
+  [data-src-index="5"] { background:#1a2a2a; color:#5eead4; border-color:#1a4a4560; }
+  .src-chip {
+    display:inline-block; padding:1px 6px; border-radius:4px;
+    font-family:monospace; font-size:10px; font-weight:600;
+    border:1px solid; white-space:nowrap; margin:1px 2px 1px 0;
+  }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('security_groups', 0) }}</span><span class="stat-lbl">Security Groups</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('sg_rules', 0) }}</span><span class="stat-lbl">Rules</span></div>
+{% endblock %}
+
+{% block content %}
+{% set active_page = 'sg' %}
+
+
+<!-- ── Multi-SG Compare View ──────────── -->
+{% if multi_compare %}
+
+{% set mc = multi_compare %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/sg">Security Groups</a>
+  <span>›</span>
+  Multi-SG Compare
+</div>
+
+<!-- Header card -->
+<div class="detail-header" style="margin-bottom:20px;">
+  <div class="detail-title">🔒 Combined Security Group Rules</div>
+  <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+    {% for sg in mc.sgs %}
+    <span class="sg-active-chip" data-src-index="{{ loop.index0 % 6 }}">
+      {{ sg.sg_id }}{% if sg.sg_name and sg.sg_name != sg.sg_id %} · <span style="opacity:.75;font-family:inherit">{{ sg.sg_name }}</span>{% endif %}
+      <span style="opacity:.45;font-size:9px;margin-left:3px;">[{{ sg.account_name }}]</span>
+    </span>
+    {% endfor %}
+  </div>
+  <div class="detail-meta" style="margin-top:14px;">
+    <div class="detail-meta-item">SGs: <span>{{ mc.sgs|length }}</span></div>
+    <div class="detail-meta-item">Total rules: <span>{{ mc.stats.total_raw }}</span></div>
+    <div class="detail-meta-item">Unique rules: <span>{{ mc.stats.unique }}</span></div>
+    {% if mc.stats.duplicates > 0 and mc.sgs|length > 1 %}
+    <div class="detail-meta-item">
+      <span style="color:#fbbf24;">⚠ {{ mc.stats.duplicates }} duplicate rule{{ 's' if mc.stats.duplicates != 1 }}</span>
+      <span style="color:#475569;font-size:11px;margin-left:4px;">(highlighted below)</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Inbound rules -->
+{% set inbound = mc.rules | selectattr('direction','equalto','inbound') | list %}
+{% if inbound %}
+<div class="direction-block">
+  <div class="direction-label dir-inbound">▼ Inbound ({{ inbound|length }})</div>
+  <div class="rule-row rule-row-header" style="grid-template-columns:80px 120px 100px 1fr 1fr 120px;">
+    <div>Protocol</div><div>Port Range</div><div>Type</div><div>Source</div><div>Description</div><div>Source SGs</div>
+  </div>
+  {% for r in inbound %}
+  <div class="rule-row{% if r.is_duplicate and mc.sgs|length > 1 %} rule-row-dupe{% endif %}"
+       style="grid-template-columns:80px 120px 100px 1fr 1fr 120px;">
+    <div class="rule-proto">{{ r.protocol or 'All' }}</div>
+    <div class="rule-ports">
+      {% if r.from_port is none %}<span class="port-all">All</span>
+      {% elif r.from_port == r.to_port %}{{ r.from_port }}
+      {% else %}{{ r.from_port }}–{{ r.to_port }}{% endif %}
+    </div>
+    <div><span class="rule-type-badge rt-{{ r.target_type }}">{{ r.target_type }}</span></div>
+    <div class="rule-target">
+      {% if r.target_type == 'sg' and r.target %}
+        <a href="/aws-inventory/sg?sg_id={{ r.target }}&account={{ mc.sgs[0].account_name }}">{{ r.target }}</a>
+      {% else %}{{ r.target or 'Any' }}{% endif %}
+    </div>
+    <div class="rule-desc">{{ r.description_rule or '—' }}</div>
+    <div>
+      {% for sid in r.sources %}
+        {% set ns = namespace(idx=0) %}
+        {% for sg in mc.sgs %}{% if sg.sg_id == sid %}{% set ns.idx = loop.index0 % 6 %}{% endif %}{% endfor %}
+        <span class="src-chip" data-src-index="{{ ns.idx }}">{{ sid }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Outbound rules -->
+{% set outbound = mc.rules | selectattr('direction','equalto','outbound') | list %}
+{% if outbound %}
+<div class="direction-block">
+  <div class="direction-label dir-outbound">▲ Outbound ({{ outbound|length }})</div>
+  <div class="rule-row rule-row-header" style="grid-template-columns:80px 120px 100px 1fr 1fr 120px;">
+    <div>Protocol</div><div>Port Range</div><div>Type</div><div>Target</div><div>Description</div><div>Source SGs</div>
+  </div>
+  {% for r in outbound %}
+  <div class="rule-row{% if r.is_duplicate and mc.sgs|length > 1 %} rule-row-dupe{% endif %}"
+       style="grid-template-columns:80px 120px 100px 1fr 1fr 120px;">
+    <div class="rule-proto">{{ r.protocol or 'All' }}</div>
+    <div class="rule-ports">
+      {% if r.from_port is none %}<span class="port-all">All</span>
+      {% elif r.from_port == r.to_port %}{{ r.from_port }}
+      {% else %}{{ r.from_port }}–{{ r.to_port }}{% endif %}
+    </div>
+    <div><span class="rule-type-badge rt-{{ r.target_type }}">{{ r.target_type }}</span></div>
+    <div class="rule-target">
+      {% if r.target_type == 'sg' and r.target %}
+        <a href="/aws-inventory/sg?sg_id={{ r.target }}&account={{ mc.sgs[0].account_name }}">{{ r.target }}</a>
+      {% else %}{{ r.target or 'Any' }}{% endif %}
+    </div>
+    <div class="rule-desc">{{ r.description_rule or '—' }}</div>
+    <div>
+      {% for sid in r.sources %}
+        {% set ns = namespace(idx=0) %}
+        {% for sg in mc.sgs %}{% if sg.sg_id == sid %}{% set ns.idx = loop.index0 % 6 %}{% endif %}{% endfor %}
+        <span class="src-chip" data-src-index="{{ ns.idx }}">{{ sid }}</span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not inbound and not outbound %}
+<div class="no-attach">No rules found for the specified security groups.</div>
+{% endif %}
+
+<!-- ── Multi-SG Compare View end ───────── -->
+{% elif detail %}
+
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/sg">Security Groups</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/sg?q={{ query }}">Search: {{ query }}</a><span>›</span>{% endif %}
+  {{ sg_id }}
+</div>
+
+{% set first = detail.rules[0] if detail.rules else None %}
+{% if first %}
+<div class="detail-header">
+  <div class="detail-title">{{ first.sg_name }}</div>
+  <div class="detail-sub">{{ first.sg_id }}</div>
+  {% if first.description %}
+  <div style="font-size:13px;color:#475569;margin-top:6px;">{{ first.description }}</div>
+  {% endif %}
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ first.account_name }}</span></div>
+    <div class="detail-meta-item">VPC: <span class="mono">{{ first.vpc_id or '—' }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ first.region }}</span></div>
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tags
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+{% set inbound  = detail.rules | selectattr('direction','equalto','inbound')  | list %}
+{% set outbound = detail.rules | selectattr('direction','equalto','outbound') | list %}
+
+{% if inbound %}
+<div class="direction-block">
+  <div class="direction-label dir-inbound">▼ Inbound ({{ inbound|length }})</div>
+  <div class="rule-row rule-row-header">
+    <div>Protocol</div><div>Port Range</div><div>Type</div><div>Source</div><div>Description</div>
+  </div>
+  {% for r in inbound %}
+  <div class="rule-row">
+    <div class="rule-proto">{{ r.protocol or 'All' }}</div>
+    <div class="rule-ports">
+      {% if r.from_port is none %}<span class="port-all">All</span>
+      {% elif r.from_port == r.to_port %}{{ r.from_port }}
+      {% else %}{{ r.from_port }}–{{ r.to_port }}{% endif %}
+    </div>
+    <div><span class="rule-type-badge rt-{{ r.target_type }}">{{ r.target_type }}</span></div>
+    <div class="rule-target">
+      {% if r.target_type == 'sg' %}
+        <a href="/aws-inventory/sg?sg_id={{ r.target }}&account={{ r.account_name }}&q={{ query }}">{{ r.target }}</a>
+      {% else %}{{ r.target or 'Any' }}{% endif %}
+    </div>
+    <div class="rule-desc">{{ r.description_rule or '—' }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if outbound %}
+<div class="direction-block">
+  <div class="direction-label dir-outbound">▲ Outbound ({{ outbound|length }})</div>
+  <div class="rule-row rule-row-header">
+    <div>Protocol</div><div>Port Range</div><div>Type</div><div>Target</div><div>Description</div>
+  </div>
+  {% for r in outbound %}
+  <div class="rule-row">
+    <div class="rule-proto">{{ r.protocol or 'All' }}</div>
+    <div class="rule-ports">
+      {% if r.from_port is none %}<span class="port-all">All</span>
+      {% elif r.from_port == r.to_port %}{{ r.from_port }}
+      {% else %}{{ r.from_port }}–{{ r.to_port }}{% endif %}
+    </div>
+    <div><span class="rule-type-badge rt-{{ r.target_type }}">{{ r.target_type }}</span></div>
+    <div class="rule-target">
+      {% if r.target_type == 'sg' %}
+        <a href="/aws-inventory/sg?sg_id={{ r.target }}&account={{ r.account_name }}&q={{ query }}">{{ r.target }}</a>
+      {% else %}{{ r.target or 'Any' }}{% endif %}
+    </div>
+    <div class="rule-desc">{{ r.description_rule or '—' }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+<div class="attachments-section">
+  <h2 class="table-title">
+    <span class="badge badge-blue">Attached To</span>
+    EC2 &amp; Load Balancers referencing this SG
+    <span class="count">{{ detail.attachments|length }}</span>
+  </h2>
+  {% if detail.attachments %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Account</th><th>Type</th><th>Name</th><th>AWS ID</th><th>IP / CIDR</th></tr></thead>
+      <tbody>
+        {% for a in detail.attachments %}
+        <tr>
+          <td><span class="account-badge">{{ a.account_name }}</span></td>
+          <td><span class="type-badge type-{{ a.type }}">{{ a.type|upper }}</span></td>
+          <td class="bold">{{ a.name }}</td>
+          <td class="mono">{{ a.aws_id }}</td>
+          <td class="mono">{{ a.ipadd or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="no-attach">No EC2 instances or load balancers found referencing this security group.</p>
+  {% endif %}
+</div>
+
+<!-- ── Search View ────────────────────── -->
+{% else %}
+
+<section class="search-section">
+  <h1>Security Group Search</h1>
+  <p class="subtitle">Search by IP address, CIDR block, security group name, or security group ID across all accounts.</p>
+  <form method="GET" action="/aws-inventory/sg" autocomplete="off">
+    <div class="search-bar">
+      <input type="text" name="q"
+             placeholder="e.g. 10.0.1.0/24  |  sg-0abc123  |  my-web-sg"
+             value="{{ query }}" autofocus minlength="2"/>
+      <button type="submit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </button>
+    </div>
+  </form>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+</section>
+
+{% if results is not none %}
+  {% if results.groups %}
+  <div class="results-header">
+    Found <strong>{{ results.groups|length }}</strong>
+    security group{{ 's' if results.groups|length != 1 }} matching <em>{{ query }}</em>
+  </div>
+  {% for sg in results.groups %}
+  <div class="sg-card">
+    <div class="sg-card-header">
+      <div>
+        <div class="sg-card-title">{{ sg.sg_name }}</div>
+        <div class="sg-card-meta">
+          <span class="mono">{{ sg.sg_id }}</span>
+          &nbsp;·&nbsp; <span class="account-badge">{{ sg.account_name }}</span>
+          &nbsp;·&nbsp; VPC: <span class="mono">{{ sg.vpc_id or '—' }}</span>
+          &nbsp;·&nbsp; {{ sg.region }}
+        </div>
+        {% if sg.description %}
+        <div style="font-size:12px;color:#475569;margin-top:4px;">{{ sg.description }}</div>
+        {% endif %}
+        {% if sg.tags %}
+        <div style="margin-top:8px;">
+          <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+                  data-tags='{{ sg.tags | tojson }}'>
+            🏷 {{ sg.tags | length }} tags
+          </button>
+        </div>
+        {% endif %}
+      </div>
+      <div class="sg-card-actions">
+        <a class="btn-detail"
+           href="/aws-inventory/sg?sg_id={{ sg.sg_id }}&account={{ sg.account_name }}&q={{ query }}">
+          View Rules →
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% elif query %}
+  <div class="no-results">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+         stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>
+    <p>No security groups found for <strong>{{ query }}</strong></p>
+    <p class="hint">Try a partial CIDR, SG ID fragment, or group name.</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+
+  document.body.appendChild(pop);
+
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.tag-popover').forEach(p => p.remove());
+});
+</script>
+{% endblock %}

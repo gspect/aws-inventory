@@ -1,0 +1,484 @@
+{% extends "base.html" %}
+{% block title %}S3 Buckets{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Search ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Bucket card ── */
+  .s3-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+             padding:16px 20px; margin-bottom:10px;
+             transition:border-color .15s, background .15s; }
+  .s3-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .s3-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .s3-card-name  { font-size:15px; font-weight:600; color:#f1f5f9; font-family:monospace; }
+  .s3-card-meta  { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .s3-meta-item  { font-size:12px; color:#64748b; }
+  .s3-meta-item span { color:#cbd5e1; }
+  .s3-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Security badges ── */
+  .pub-badge-safe { background:#14352a; color:#6ee7b7; padding:2px 9px;
+                    border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .pub-badge-warn { background:#2a1a10; color:#fb923c; padding:2px 9px;
+                    border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .enc-badge      { background:#1e2040; color:#a5b4fc; padding:2px 9px;
+                    border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .enc-badge-none { background:#2a1010; color:#fca5a5; padding:2px 9px;
+                    border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+
+  /* ── Bool pills ── */
+  .bool-yes  { color:#6ee7b7; font-weight:600; }
+  .bool-no   { color:#475569; }
+  .bool-warn { color:#fb923c; font-weight:600; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; font-family:monospace; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:200px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Storage pie layout ── */
+  .storage-layout { display:grid; grid-template-columns:260px 1fr; gap:24px; align-items:start; }
+  @media (max-width:720px) { .storage-layout { grid-template-columns:1fr; } }
+
+  .pie-wrap { position:relative; width:220px; height:220px; margin:0 auto; }
+  .pie-wrap canvas { display:block; }
+  .pie-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+                text-align:center; pointer-events:none; }
+  .pie-center-size  { font-size:18px; font-weight:700; color:#f1f5f9; }
+  .pie-center-label { font-size:11px; color:#64748b; margin-top:2px; }
+
+  .storage-legend { display:flex; flex-direction:column; gap:8px; }
+  .legend-row { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .legend-dot { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+  .legend-name { color:#cbd5e1; flex:1; }
+  .legend-size { color:#94a3b8; font-family:monospace; white-space:nowrap; }
+  .legend-pct  { color:#475569; font-size:11px; white-space:nowrap; min-width:36px; text-align:right; }
+
+  .no-storage { color:#475569; font-size:13px; text-align:center; padding:32px 0; }
+
+  /* ── PAB grid ── */
+  .pab-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:600px) { .pab-grid { grid-template-columns:1fr; } }
+  .pab-item { background:#0f1117; border:1px solid #1e2130; border-radius:8px; padding:12px 14px; }
+  .pab-label { font-size:11px; font-weight:700; text-transform:uppercase;
+               letter-spacing:.4px; color:#475569; margin-bottom:4px; }
+  .pab-value { font-size:13px; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('s3_buckets', 0) }}</span><span class="stat-lbl">Buckets</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('s3_total_gb', 0) }} GB</span><span class="stat-lbl">Total Storage</span></div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW
+════════════════════════════════════════════════════ -->
+{% if view == 'detail' and detail %}
+{% set b = detail.bucket %}
+{% set summary = detail.summary %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/s3">S3 Buckets</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/s3?q={{ query }}">Results</a><span>›</span>{% endif %}
+  {{ b.bucket_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ b.bucket_name }}</div>
+    {% if b.fully_public_blocked %}
+      <span class="pub-badge-safe">🔒 Public Access Blocked</span>
+    {% else %}
+      <span class="pub-badge-warn">⚠ Public Access Not Fully Blocked</span>
+    {% endif %}
+    {% if b.encryption_enabled %}
+      <span class="enc-badge">🔐 {{ b.encryption_type or 'Encrypted' }}</span>
+    {% else %}
+      <span class="enc-badge-none">No Encryption</span>
+    {% endif %}
+  </div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ b.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ b.region or '—' }}</span></div>
+    <div class="detail-meta-item">Created: <span>{{ b.creation_date.strftime('%Y-%m-%d') if b.creation_date else '—' }}</span></div>
+    <div class="detail-meta-item">Objects: <span>{{ '{:,}'.format(summary.object_count) if summary.object_count else '—' }}</span></div>
+    <div class="detail-meta-item">Total Size: <span>{{ '%.2f GB' % (summary.size_bytes / 1073741824) if summary.size_bytes else '—' }}</span></div>
+    {% if summary.metric_date %}
+    <div class="detail-meta-item">Metric Date: <span>{{ summary.metric_date }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Storage Class Breakdown -->
+<div class="section-card">
+  <div class="section-title">Storage Class Breakdown</div>
+  {% if detail.storage_breakdown %}
+  <div class="storage-layout">
+    <div>
+      <div class="pie-wrap">
+        <canvas id="storagePie" width="220" height="220"></canvas>
+        <div class="pie-center">
+          <div class="pie-center-size" id="pieCenterSize">
+            {{ '%.1f GB' % (summary.size_bytes / 1073741824) if summary.size_bytes else '0 GB' }}
+          </div>
+          <div class="pie-center-label">total</div>
+        </div>
+      </div>
+    </div>
+    <div class="storage-legend" id="storageLegend"></div>
+  </div>
+
+  <script>
+  (function() {
+    var raw = {{ detail.storage_breakdown | tojson }};
+    var total = raw.reduce(function(s, r) { return s + r.size_bytes; }, 0);
+
+    // Friendly display names for storage class identifiers
+    var LABELS = {
+      "StandardStorage":                  "Standard",
+      "StandardIAStorage":                "Standard-IA",
+      "OneZoneIAStorage":                 "One Zone-IA",
+      "ReducedRedundancyStorage":         "Reduced Redundancy",
+      "GlacierInstantRetrievalStorage":   "Glacier Instant",
+      "GlacierStorage":                   "Glacier Flexible",
+      "DeepArchiveStorage":               "Glacier Deep Archive",
+      "IntelligentTieringFAStorage":      "INT — Frequent Access",
+      "IntelligentTieringIAStorage":      "INT — Infrequent Access",
+      "IntelligentTieringAAStorage":      "INT — Archive Access",
+      "IntelligentTieringAIAStorage":     "INT — Archive Instant",
+      "IntelligentTieringDAAStorage":     "INT — Deep Archive",
+      "ExpressOneZoneStorage":            "Express One Zone",
+    };
+
+    var COLORS = [
+      "#3b82f6","#22d3ee","#a78bfa","#34d399","#fb923c",
+      "#f472b6","#fbbf24","#6ee7b7","#818cf8","#e879f9",
+      "#38bdf8","#4ade80","#f87171"
+    ];
+
+    function fmtBytes(b) {
+      if (b >= 1099511627776) return (b/1099511627776).toFixed(2) + ' TB';
+      if (b >= 1073741824)    return (b/1073741824).toFixed(2)    + ' GB';
+      if (b >= 1048576)       return (b/1048576).toFixed(1)       + ' MB';
+      if (b >= 1024)          return (b/1024).toFixed(0)          + ' KB';
+      return b + ' B';
+    }
+
+    // Draw donut chart
+    var canvas = document.getElementById('storagePie');
+    var ctx    = canvas.getContext('2d');
+    var cx = 110, cy = 110, ro = 95, ri = 60;
+    var TAU = 2 * Math.PI, gap = 0.018;
+    var start = -Math.PI / 2;
+
+    raw.forEach(function(r, i) {
+      var frac = r.size_bytes / total;
+      var sweep = frac * TAU - gap;
+      ctx.beginPath();
+      ctx.moveTo(cx + ro * Math.cos(start), cy + ro * Math.sin(start));
+      ctx.arc(cx, cy, ro, start, start + sweep);
+      ctx.arc(cx, cy, ri, start + sweep, start, true);
+      ctx.closePath();
+      ctx.fillStyle = COLORS[i % COLORS.length];
+      ctx.fill();
+      start += sweep + gap;
+    });
+
+    // Inner circle (donut hole)
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri - 2, 0, TAU);
+    ctx.fillStyle = '#141722';
+    ctx.fill();
+
+    // Build legend
+    var legend = document.getElementById('storageLegend');
+    raw.forEach(function(r, i) {
+      var pct  = (r.size_bytes / total * 100).toFixed(1);
+      var name = LABELS[r.storage_type] || r.storage_type;
+      var row  = document.createElement('div');
+      row.className = 'legend-row';
+      row.innerHTML =
+        '<div class="legend-dot" style="background:' + COLORS[i % COLORS.length] + '"></div>' +
+        '<span class="legend-name">' + escHtml(name) + '</span>' +
+        '<span class="legend-size">' + fmtBytes(r.size_bytes) + '</span>' +
+        '<span class="legend-pct">' + pct + '%</span>';
+      legend.appendChild(row);
+    });
+  })();
+  </script>
+
+  {% else %}
+  <div class="no-storage">
+    CloudWatch storage metrics are unavailable for this bucket.<br>
+    <small style="color:#475569">AWS publishes daily S3 storage metrics on a best-effort basis —
+    some buckets, particularly older ones, do not appear in CloudWatch regardless of their contents.</small>
+  </div>
+
+  {% endif %}
+</div>
+
+<!-- Configuration -->
+<div class="section-card">
+  <div class="section-title">Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">Versioning</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.versioning == 'Enabled' else 'bool-no' }}">{{ b.versioning or 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">MFA Delete</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.mfa_delete == 'Enabled' else 'bool-no' }}">{{ b.mfa_delete or 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">Object Lock</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.object_lock_enabled else 'bool-no' }}">{{ 'Enabled' if b.object_lock_enabled else 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">Replication</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.replication_enabled else 'bool-no' }}">{{ 'Enabled' if b.replication_enabled else 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">Static Website</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.website_enabled else 'bool-no' }}">{{ 'Enabled' if b.website_enabled else 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">Server Access Logging</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if b.logging_enabled else 'bool-warn' }}">{{ 'Enabled' if b.logging_enabled else 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">Lifecycle Rules</div>
+    <div class="kv-value">
+      {% if b.lifecycle_rules %}
+        <span class="bool-yes">{{ b.lifecycle_rule_count }} rule{{ 's' if b.lifecycle_rule_count != 1 else '' }}</span>
+      {% else %}
+        <span class="bool-no">None</span>
+      {% endif %}
+    </div>
+    <div class="kv-label">Last Collected</div>
+    <div class="kv-value">{{ b.last_seen }}</div>
+  </div>
+</div>
+
+<!-- Public Access Block -->
+<div class="section-card">
+  <div class="section-title">Public Access Block Settings</div>
+  <div class="pab-grid">
+    <div class="pab-item">
+      <div class="pab-label">Block Public ACLs</div>
+      <div class="pab-value {{ 'bool-yes' if b.block_public_acls else 'bool-warn' }}">
+        {{ '✔ Enabled' if b.block_public_acls else '✘ Disabled' }}
+      </div>
+    </div>
+    <div class="pab-item">
+      <div class="pab-label">Ignore Public ACLs</div>
+      <div class="pab-value {{ 'bool-yes' if b.ignore_public_acls else 'bool-warn' }}">
+        {{ '✔ Enabled' if b.ignore_public_acls else '✘ Disabled' }}
+      </div>
+    </div>
+    <div class="pab-item">
+      <div class="pab-label">Block Public Policy</div>
+      <div class="pab-value {{ 'bool-yes' if b.block_public_policy else 'bool-warn' }}">
+        {{ '✔ Enabled' if b.block_public_policy else '✘ Disabled' }}
+      </div>
+    </div>
+    <div class="pab-item">
+      <div class="pab-label">Restrict Public Buckets</div>
+      <div class="pab-value {{ 'bool-yes' if b.restrict_public_buckets else 'bool-warn' }}">
+        {{ '✔ Enabled' if b.restrict_public_buckets else '✘ Disabled' }}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if detail.tags %}
+<!-- Tags -->
+<div class="section-card">
+  <div class="section-title">Tags ({{ detail.tags | length }})</div>
+  <div class="kv-grid">
+    {% for tag in detail.tags %}
+    <div class="kv-label">{{ tag.k }}</div>
+    <div class="kv-value">{{ tag.v or '—' }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+{% if error %}
+<div class="error-msg">{{ error }}</div>
+{% endif %}
+
+<form method="get" action="/aws-inventory/s3">
+  <div class="search-row">
+    <input type="text" name="q" value="{{ query }}"
+           placeholder="Search bucket name, account, region…" autofocus>
+    <button type="submit">Search</button>
+  </div>
+</form>
+
+{% if buckets %}
+  {% for b in buckets %}
+  <div class="s3-card">
+    <div class="s3-card-header">
+      <div style="flex:1;min-width:0;">
+        <div class="s3-card-name">{{ b.bucket_name }}</div>
+      </div>
+
+      {% if b.fully_public_blocked %}
+        <span class="pub-badge-safe">🔒 Blocked</span>
+      {% else %}
+        <span class="pub-badge-warn">⚠ Public</span>
+      {% endif %}
+
+      {% if b.encryption_enabled %}
+        <span class="enc-badge">🔐 {{ b.encryption_type or 'SSE' }}</span>
+      {% else %}
+        <span class="enc-badge-none">No Enc</span>
+      {% endif %}
+
+      <div class="s3-card-actions">
+        <a class="btn-detail"
+           href="/aws-inventory/s3?bucket={{ b.bucket_name }}{% if query %}&q={{ query }}{% endif %}">
+          Details →
+        </a>
+      </div>
+    </div>
+
+    <div class="s3-card-meta">
+      <div class="s3-meta-item">Account: <span>{{ b.account_name }}</span></div>
+      <div class="s3-meta-item">Region: <span>{{ b.region or '—' }}</span></div>
+      <div class="s3-meta-item">
+        Size: <span>
+          {% if b.total_bytes %}
+            {% if b.total_bytes >= 1099511627776 %}{{ '%.2f TB' % (b.total_bytes / 1099511627776) }}
+            {% elif b.total_bytes >= 1073741824    %}{{ '%.2f GB' % (b.total_bytes / 1073741824) }}
+            {% elif b.total_bytes >= 1048576       %}{{ '%.1f MB' % (b.total_bytes / 1048576) }}
+            {% else %}{{ b.total_bytes }} B{% endif %}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+      <div class="s3-meta-item">Objects: <span>{{ '{:,}'.format(b.object_count) if b.object_count else '—' }}</span></div>
+      <div class="s3-meta-item">Versioning: <span class="{{ 'bool-yes' if b.versioning == 'Enabled' else 'bool-no' }}">{{ b.versioning or 'Disabled' }}</span></div>
+      <div class="s3-meta-item">Lifecycle: <span class="{{ 'bool-yes' if b.lifecycle_rules else 'bool-no' }}">
+        {% if b.lifecycle_rules %}{{ b.lifecycle_rule_count }} rule{{ 's' if b.lifecycle_rule_count != 1 else '' }}{% else %}None{% endif %}
+      </span></div>
+      {% if b.replication_enabled %}
+      <div class="s3-meta-item">Replication: <span class="bool-yes">Enabled</span></div>
+      {% endif %}
+      {% if b.website_enabled %}
+      <div class="s3-meta-item">Website: <span class="bool-yes">Enabled</span></div>
+      {% endif %}
+      {% if b.metric_date %}
+      <div class="s3-meta-item">Metric Date: <span>{{ b.metric_date }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if buckets | length == 500 %}
+  <div style="text-align:center;color:#475569;font-size:12px;padding:12px 0;">
+    Showing first 500 results — refine your search to narrow results.
+  </div>
+  {% endif %}
+
+{% elif query %}
+  <div class="no-results">No buckets found matching "{{ query }}"</div>
+{% else %}
+  <div class="no-results">No S3 buckets found. Run collect_s3.py to populate.</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.tag-popover').forEach(function(p) { p.remove(); });
+});
+</script>
+{% endblock %}

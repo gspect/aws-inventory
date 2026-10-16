@@ -1,0 +1,897 @@
+{% extends "base.html" %}
+{% block title %}EKS Clusters{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Search ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Cluster card ── */
+  .eks-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+              padding:16px 20px; margin-bottom:10px;
+              transition:border-color .15s, background .15s; }
+  .eks-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .eks-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .eks-card-title  { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .eks-card-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px; }
+  .eks-card-meta   { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .eks-meta-item   { font-size:12px; color:#64748b; }
+  .eks-meta-item span { color:#cbd5e1; }
+  .eks-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Status badges ── */
+  .status-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .status-active   { background:#14352a; color:#6ee7b7; }
+  .status-creating { background:#1e2d1e; color:#86efac; }
+  .status-updating { background:#1e2040; color:#a5b4fc; }
+  .status-deleting { background:#2a1010; color:#fca5a5; }
+  .status-failed   { background:#2a1010; color:#f87171; }
+  .status-other    { background:#1e2130; color:#94a3b8; }
+
+  /* ── Version badge ── */
+  .k8s-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700;
+               background:#1e2a14; color:#86efac; white-space:nowrap; }
+
+  /* ── Capacity type badge ── */
+  .cap-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .cap-on-demand { background:#1e2040; color:#a5b4fc; }
+  .cap-spot      { background:#2a1f0a; color:#fb923c; }
+  .cap-other     { background:#1e2130; color:#94a3b8; }
+
+  /* ── Bool pills ── */
+  .bool-yes  { color:#6ee7b7; font-weight:600; }
+  .bool-no   { color:#475569; }
+  .bool-warn { color:#fb923c; font-weight:600; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:4px; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:220px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Net chips ── */
+  .net-chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0;
+              background:#1a1d27; border:1px solid #2d3148; border-radius:5px;
+              font-size:11px; font-family:monospace; color:#94a3b8; }
+
+  /* ── Node group cards ── */
+  .ng-card { background:#0f1117; border:1px solid #1e2130; border-radius:8px;
+             padding:14px 18px; margin-bottom:10px; }
+  .ng-card-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .ng-name  { font-size:14px; font-weight:600; color:#f1f5f9; flex:1; }
+  .ng-meta  { display:flex; flex-wrap:wrap; gap:12px; }
+  .ng-meta-item { font-size:12px; color:#64748b; }
+  .ng-meta-item span { color:#cbd5e1; }
+
+  /* ── Scaling indicator ── */
+  .scaling-bar { display:flex; align-items:center; gap:8px; }
+  .scaling-num { font-size:13px; font-family:monospace; color:#f1f5f9; font-weight:600; }
+  .scaling-range { font-size:11px; color:#475569; }
+  .scale-track { width:100px; height:6px; background:#1e2130; border-radius:3px; overflow:hidden; }
+  .scale-fill  { height:100%; background:#3b82f6; border-radius:3px; transition:width .3s; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+
+  /* ── Fleet Summary Panel ────────────────────────── */
+  .fleet-summary { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   margin-bottom:20px; overflow:hidden; }
+  .fleet-summary-header { display:flex; align-items:center; justify-content:space-between;
+                          padding:12px 20px; cursor:pointer; user-select:none;
+                          transition:background .15s; }
+  .fleet-summary-header:hover { background:#1a1d27; }
+  .fleet-summary-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                         letter-spacing:.6px; color:#475569; }
+  .fleet-summary-toggle { font-size:11px; color:#475569; }
+  .fleet-summary-body { padding:4px 20px 18px;
+                        display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; }
+  .fleet-stat-group { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .fleet-stat { display:flex; flex-direction:column; }
+  .fleet-stat-num { font-size:22px; font-weight:700; color:#f1f5f9;
+                    font-family:monospace; line-height:1.1; }
+  .fleet-stat-lbl { font-size:11px; color:#475569; margin-top:3px; white-space:nowrap; }
+  .fleet-vdivider { width:1px; background:#1e2130; align-self:stretch; margin:0 4px; }
+  .fleet-hdivider { width:100%; height:1px; background:#1e2130; margin:4px 0; }
+  .fleet-posture-row { font-size:12px; color:#64748b; }
+  .fleet-posture-row + .fleet-posture-row { margin-top:4px; }
+
+  /* ═══════════════════════════════════════════
+     Node History Chart
+  ═══════════════════════════════════════════ */
+  .history-section { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                     padding:18px 22px; margin-bottom:16px; }
+
+  /* Top toolbar row */
+  .history-toolbar { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+                     margin-bottom:14px; }
+  .history-title   { font-size:12px; font-weight:700; text-transform:uppercase;
+                     letter-spacing:.6px; color:#475569; flex:1; min-width:140px; }
+
+  /* Grouped toggle sets */
+  .toggle-group { display:flex; gap:4px; }
+  .toggle-label { font-size:11px; color:#334155; margin-right:2px;
+                  display:flex; align-items:center; }
+  .toggle-btn { padding:4px 12px; background:#1a1d27; border:1px solid #2d3148;
+                border-radius:5px; font-size:11px; font-weight:600; color:#64748b;
+                cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .toggle-btn:hover  { border-color:#3d4468; color:#94a3b8; }
+  .toggle-btn.active { background:#1e3a5f; border-color:#1e4976; color:#93c5fd; }
+
+  /* Summary stats */
+  .history-stats { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:14px;
+                   padding:10px 14px; background:#0f1117; border-radius:7px;
+                   border:1px solid #1e2130; }
+  .hstat       { font-size:12px; color:#64748b; }
+  .hstat span  { color:#cbd5e1; font-weight:600; font-family:monospace; }
+
+  /* Chart */
+  .chart-wrap    { position:relative; height:360px; }
+  .chart-loading { display:flex; align-items:center; justify-content:center;
+                   height:360px; color:#475569; font-size:13px; gap:8px; }
+  .chart-empty   { display:flex; align-items:center; justify-content:center;
+                   height:140px; color:#475569; font-size:13px;
+                   flex-direction:column; gap:6px; }
+  .chart-empty small { font-size:11px; color:#334155; }
+
+  /* Legend */
+  .series-legend      { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .series-legend-item { display:flex; align-items:center; gap:5px;
+                        font-size:11px; color:#64748b; font-family:monospace; }
+  .series-legend-dot  { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+  /* Spinner */
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .spinner { width:14px; height:14px; border:2px solid #1e2130;
+             border-top-color:#3b82f6; border-radius:50%;
+             animation:spin .7s linear infinite; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('eks_clusters', 0) }}</span><span class="stat-lbl">Clusters</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('eks_nodegroups', 0) }}</span><span class="stat-lbl">Node Groups</span></div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW
+════════════════════════════════════════════════════ -->
+{% if view == 'detail' and detail %}
+{% set c = detail.cluster %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/eks">EKS Clusters</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/eks?q={{ query }}">Results</a><span>›</span>{% endif %}
+  {{ c.cluster_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ c.cluster_name }}</div>
+    {% set sc = c.status | lower %}
+    <span class="status-badge status-{{ sc if sc in ['active','creating','updating','deleting','failed'] else 'other' }}">
+      {{ c.status }}
+    </span>
+    <span class="k8s-badge">k8s {{ c.kubernetes_version }}</span>
+    {% if c.platform_version %}
+    <span style="background:#1e2130;color:#64748b;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">
+      {{ c.platform_version }}
+    </span>
+    {% endif %}
+    {% if c.secrets_encrypted %}
+    <span style="background:#1e2a14;color:#86efac;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">🔐 Secrets Encrypted</span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ c.cluster_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ c.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ c.region }}</span></div>
+    <div class="detail-meta-item">VPC: <span>{{ c.vpc_id or '—' }}</span></div>
+    <div class="detail-meta-item">Node Groups: <span>{{ detail.nodegroups | length }}</span></div>
+    {% if c.created_at %}
+    <div class="detail-meta-item">Created: <span>{{ c.created_at.strftime('%Y-%m-%d') }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Networking & Access -->
+<div class="section-card">
+  <div class="section-title">Networking &amp; Access</div>
+  <div class="kv-grid">
+    <div class="kv-label">API Endpoint</div>
+    <div class="kv-value">{{ c.endpoint or '—' }}</div>
+    <div class="kv-label">Public Access</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if c.endpoint_public_access else 'bool-no' }}">
+        {{ 'Enabled' if c.endpoint_public_access else 'Disabled' }}
+      </span>
+    </div>
+    <div class="kv-label">Private Access</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if c.endpoint_private_access else 'bool-no' }}">
+        {{ 'Enabled' if c.endpoint_private_access else 'Disabled' }}
+      </span>
+    </div>
+    {% set cidrs = c.public_access_cidrs | fromjson if c.public_access_cidrs else [] %}
+    {% if cidrs and cidrs != ['0.0.0.0/0'] %}
+    <div class="kv-label">Public Access CIDRs</div>
+    <div class="kv-value">
+      {% for cidr in cidrs %}<span class="net-chip">{{ cidr }}</span>{% endfor %}
+    </div>
+    {% elif cidrs == ['0.0.0.0/0'] %}
+    <div class="kv-label">Public Access CIDRs</div>
+    <div class="kv-value"><span class="bool-warn">0.0.0.0/0 (open to internet)</span></div>
+    {% endif %}
+    {% if c.cluster_sg_id %}
+    <div class="kv-label">Cluster SG</div>
+    <div class="kv-value">{{ c.cluster_sg_id }}</div>
+    {% endif %}
+    {% if c.service_ipv4_cidr %}
+    <div class="kv-label">Service CIDR</div>
+    <div class="kv-value">{{ c.service_ipv4_cidr }}</div>
+    {% endif %}
+    {% if c.ip_family %}
+    <div class="kv-label">IP Family</div>
+    <div class="kv-value">{{ c.ip_family }}</div>
+    {% endif %}
+  </div>
+
+  {% set subnets = c.subnet_ids | fromjson if c.subnet_ids else [] %}
+  {% if subnets %}
+  <div style="margin-top:14px;">
+    <div class="kv-label" style="margin-bottom:6px;">Subnets ({{ subnets | length }})</div>
+    {% for s in subnets %}<span class="net-chip">{{ s }}</span>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% set sgs = c.security_group_ids | fromjson if c.security_group_ids else [] %}
+  {% if sgs %}
+  <div style="margin-top:12px;">
+    <div class="kv-label" style="margin-bottom:6px;">Security Groups</div>
+    {% for sg in sgs %}<span class="net-chip">{{ sg }}</span>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Logging -->
+{% set logs = c.logging_enabled | fromjson if c.logging_enabled else [] %}
+<div class="section-card">
+  <div class="section-title">Control Plane Logging</div>
+  {% if logs %}
+  <div style="display:flex;flex-wrap:wrap;gap:8px;">
+    {% for log_type in ['api','audit','authenticator','controllerManager','scheduler'] %}
+    <span style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;
+                 {% if log_type in logs %}background:#14352a;color:#6ee7b7;
+                 {% else %}background:#1e2130;color:#475569;{% endif %}">
+      {{ log_type }}
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <span class="bool-no">No control plane logging enabled</span>
+  {% endif %}
+</div>
+
+<!-- Node Groups (managed — from collect_eks.py) -->
+<div class="section-card">
+  <div class="section-title">Managed Node Groups ({{ detail.nodegroups | length }})</div>
+  {% if detail.nodegroups %}
+    {% for ng in detail.nodegroups %}
+    {% set ng_sc = ng.status | lower %}
+    {% set instance_types = ng.instance_types | fromjson if ng.instance_types else [] %}
+    {% set max_s = ng.max_size if ng.max_size and ng.max_size > 0 else 1 %}
+    {% set fill_pct = ((ng.desired_size / max_s) * 100) | int %}
+    <div class="ng-card">
+      <div class="ng-card-header">
+        <div class="ng-name">{{ ng.nodegroup_name }}</div>
+        <span class="status-badge status-{{ ng_sc if ng_sc in ['active','creating','updating','deleting','failed'] else 'other' }}">
+          {{ ng.status }}
+        </span>
+        {% if ng.capacity_type %}
+        <span class="cap-badge cap-{{ ng.capacity_type | lower if ng.capacity_type | lower in ['on-demand','spot'] else 'other' }}">
+          {{ ng.capacity_type }}
+        </span>
+        {% endif %}
+        {% if ng.ami_type %}
+        <span style="background:#1e2130;color:#94a3b8;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">
+          {{ ng.ami_type }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="ng-meta">
+        {% if instance_types %}
+        <div class="ng-meta-item">Instances: <span>{{ instance_types | join(', ') }}</span></div>
+        {% endif %}
+        <div class="ng-meta-item">
+          Scaling:
+          <span>
+            <span style="display:inline-flex;align-items:center;gap:6px;">
+              <span class="scaling-num">{{ ng.desired_size }}</span>
+              <span class="scaling-range">({{ ng.min_size }}–{{ ng.max_size }})</span>
+              <span class="scale-track"><span class="scale-fill" style="width:{{ fill_pct }}%"></span></span>
+            </span>
+          </span>
+        </div>
+        {% if ng.disk_size_gb %}
+        <div class="ng-meta-item">Disk: <span>{{ ng.disk_size_gb }} GB</span></div>
+        {% endif %}
+        {% if ng.ami_release_version %}
+        <div class="ng-meta-item">AMI Release: <span>{{ ng.ami_release_version }}</span></div>
+        {% endif %}
+        {% if ng.created_at %}
+        <div class="ng-meta-item">Created: <span>{{ ng.created_at.strftime('%Y-%m-%d') }}</span></div>
+        {% endif %}
+      </div>
+
+      {% set labels = ng.labels | fromjson if ng.labels else {} %}
+      {% if labels %}
+      <div style="margin-top:10px;">
+        <div class="kv-label" style="margin-bottom:5px;">Labels</div>
+        {% for k, v in labels.items() %}
+        <span class="net-chip">{{ k }}={{ v }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% set taints = ng.taints | fromjson if ng.taints else [] %}
+      {% if taints %}
+      <div style="margin-top:8px;">
+        <div class="kv-label" style="margin-bottom:5px;">Taints</div>
+        {% for t in taints %}
+        <span class="net-chip" style="color:#fcd34d;">{{ t.key }}{{ '=' + t.value if t.value else '' }}:{{ t.effect }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+  <div style="color:#475569;font-size:13px;padding:12px 0;">No managed node groups found for this cluster.</div>
+  {% endif %}
+</div>
+
+<!-- ── Node Scaling History ─────────────────────────────────────────── -->
+<div class="history-section" id="historySection">
+
+  <div class="history-toolbar">
+    <div class="history-title">📈 Node Scaling History</div>
+
+    <!-- Group-by toggle -->
+    <span class="toggle-label">Group:</span>
+    <div class="toggle-group" id="groupToggle">
+      <button class="toggle-btn active" data-group="instance_type"
+              onclick="setGroupBy('instance_type')">Instance Type</button>
+      <button class="toggle-btn" data-group="node_group"
+              onclick="setGroupBy('node_group')">Node Group</button>
+      <button class="toggle-btn" data-group="capacity_type"
+              onclick="setGroupBy('capacity_type')">Capacity</button>
+      <button class="toggle-btn" data-group="asg_name"
+	      onclick="setGroupBy('asg_name')">ASG</button>
+    </div>
+
+    <!-- Range toggle -->
+    <span class="toggle-label" style="margin-left:6px;">Range:</span>
+    <div class="toggle-group" id="rangeToggle">
+      <button class="toggle-btn" data-days="7"  onclick="setDays(7)">7d</button>
+      <button class="toggle-btn active" data-days="30" onclick="setDays(30)">30d</button>
+      <button class="toggle-btn" data-days="90" onclick="setDays(90)">90d</button>
+    </div>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="history-stats" id="historyStats" style="display:none;">
+    <div class="hstat">Current Total: <span id="statCurrent">—</span> nodes</div>
+    <div class="hstat">Period Peak: <span id="statPeak">—</span> nodes</div>
+    <div class="hstat">Period Avg: <span id="statAvg">—</span> nodes</div>
+    <div class="hstat">Snapshots: <span id="statPoints">—</span></div>
+  </div>
+
+  <!-- Chart -->
+  <div id="chartLoading" class="chart-loading">
+    <div class="spinner"></div> Loading history…
+  </div>
+  <div id="chartEmpty" class="chart-empty" style="display:none;">
+    <div>No history data yet</div>
+    <small>Data is collected hourly — check back after the first cron run completes</small>
+  </div>
+  <div id="chartWrap" class="chart-wrap" style="display:none;">
+    <canvas id="nodeHistoryChart"></canvas>
+  </div>
+
+  <!-- Legend -->
+  <div class="series-legend" id="seriesLegend"></div>
+</div>
+
+{% if detail.tags %}
+<div class="section-card">
+  <div class="section-title">Tags ({{ detail.tags | length }})</div>
+  <div class="kv-grid">
+    {% for tag in detail.tags %}
+    <div class="kv-label">{{ tag.k }}</div>
+    <div class="kv-value">{{ tag.v or '—' }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+{% if error %}
+<div class="error-msg">{{ error }}</div>
+{% endif %}
+
+{% if fleet_summary and not query %}
+{% set fs = fleet_summary %}
+<div class="fleet-summary" id="fleetSummary">
+  <div class="fleet-summary-header" onclick="toggleFleetSummary()">
+    <span class="fleet-summary-title">📊 Fleet Overview</span>
+    <span class="fleet-summary-toggle" id="fleetToggleIcon">▲</span>
+  </div>
+  <div class="fleet-summary-body" id="fleetSummaryBody">
+
+    <!-- Cluster + node group counts -->
+    <div class="fleet-stat-group">
+      <div class="fleet-stat">
+        <div class="fleet-stat-num">{{ fs.total_clusters }}</div>
+        <div class="fleet-stat-lbl">Clusters</div>
+      </div>
+      <div class="fleet-stat">
+        <div class="fleet-stat-num" style="color:#6ee7b7">{{ fs.active_clusters }}</div>
+        <div class="fleet-stat-lbl">Active</div>
+      </div>
+      {% set non_active = fs.total_clusters - fs.active_clusters %}
+      {% if non_active > 0 %}
+      <div class="fleet-stat">
+        <div class="fleet-stat-num" style="color:#fb923c">{{ non_active }}</div>
+        <div class="fleet-stat-lbl">Non-Active</div>
+      </div>
+      {% endif %}
+      <div class="fleet-stat">
+        <div class="fleet-stat-num">{{ fs.total_ngs }}</div>
+        <div class="fleet-stat-lbl">Node Groups</div>
+      </div>
+    </div>
+
+    <div class="fleet-vdivider"></div>
+
+    <!-- Node capacity -->
+    <div class="fleet-stat-group">
+      <div class="fleet-stat">
+        <div class="fleet-stat-num">{{ fs.total_desired }}</div>
+        <div class="fleet-stat-lbl">Nodes Running</div>
+      </div>
+      <div class="fleet-stat">
+        <div class="fleet-stat-num" style="color:#94a3b8">{{ fs.total_max }}</div>
+        <div class="fleet-stat-lbl">Max Capacity</div>
+      </div>
+      {% if fs.on_demand_ngs %}
+      <div class="fleet-stat">
+        <div class="fleet-stat-num" style="color:#a5b4fc">{{ fs.on_demand_ngs }}</div>
+        <div class="fleet-stat-lbl">On-Demand NGs</div>
+      </div>
+      {% endif %}
+      {% if fs.spot_ngs %}
+      <div class="fleet-stat">
+        <div class="fleet-stat-num" style="color:#fb923c">{{ fs.spot_ngs }}</div>
+        <div class="fleet-stat-lbl">Spot NGs</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="fleet-vdivider"></div>
+
+    <!-- k8s version distribution -->
+    {% if fs.version_dist %}
+    <div class="fleet-stat">
+      <div class="fleet-stat-lbl" style="margin-bottom:7px;">k8s Versions</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+        {% for v in fs.version_dist %}
+        <span class="k8s-badge" style="font-size:11px;">
+          {{ v.kubernetes_version }}<span style="opacity:.55;font-weight:400;margin-left:3px;">×{{ v.cnt }}</span>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="fleet-vdivider"></div>
+    {% endif %}
+
+    <!-- Security posture -->
+    <div class="fleet-stat">
+      <div class="fleet-stat-lbl" style="margin-bottom:7px;">Security Posture</div>
+      <div class="fleet-posture-row">
+        Public API:
+        <span style="font-weight:600;color:{% if fs.public_api_count > 0 %}#fb923c{% else %}#6ee7b7{% endif %};">
+          {{ fs.public_api_count }} / {{ fs.total_clusters }}
+        </span>
+      </div>
+      <div class="fleet-posture-row">
+        Secrets Encrypted:
+        <span style="font-weight:600;color:{% if fs.secrets_enc_count == fs.total_clusters %}#6ee7b7{% else %}#fb923c{% endif %};">
+          {{ fs.secrets_enc_count }} / {{ fs.total_clusters }}
+        </span>
+      </div>
+      <div class="fleet-posture-row">
+        No Control Plane Logging:
+        <span style="font-weight:600;color:{% if fs.no_logging_count > 0 %}#fb923c{% else %}#6ee7b7{% endif %};">
+          {{ fs.no_logging_count }} cluster{{ 's' if fs.no_logging_count != 1 }}
+        </span>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+<form method="get" action="/aws-inventory/eks">
+  <div class="search-row">
+    <input type="text" name="q" value="{{ query }}"
+           placeholder="Search cluster name, account, region, VPC, k8s version…" autofocus>
+    <button type="submit">Search</button>
+  </div>
+</form>
+
+{% if clusters %}
+  {% for c in clusters %}
+  {% set sc = c.status | lower %}
+  {% set logs = c.logging_enabled | fromjson if c.logging_enabled else [] %}
+  <div class="eks-card">
+    <div class="eks-card-header">
+      <div style="flex:1;min-width:0;">
+        <div class="eks-card-title">{{ c.cluster_name }}</div>
+        <div class="eks-card-sub">{{ c.cluster_arn }}</div>
+      </div>
+      <span class="status-badge status-{{ sc if sc in ['active','creating','updating','deleting','failed'] else 'other' }}">
+        {{ c.status }}
+      </span>
+      <span class="k8s-badge">k8s {{ c.kubernetes_version }}</span>
+      {% if not c.endpoint_public_access %}
+      <span style="background:#1e2a14;color:#86efac;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">Private</span>
+      {% endif %}
+      <div class="eks-card-actions">
+        <a class="btn-detail"
+           href="/aws-inventory/eks?cluster_name={{ c.cluster_name }}&account={{ c.account_name }}&region={{ c.region }}{% if query %}&q={{ query }}{% endif %}">
+          Details →
+        </a>
+      </div>
+    </div>
+    <div class="eks-card-meta">
+      <div class="eks-meta-item">Account: <span>{{ c.account_name }}</span></div>
+      <div class="eks-meta-item">Region: <span>{{ c.region }}</span></div>
+      <div class="eks-meta-item">VPC: <span>{{ c.vpc_id or '—' }}</span></div>
+      <div class="eks-meta-item">Platform: <span>{{ c.platform_version or '—' }}</span></div>
+      <div class="eks-meta-item">Public API: <span class="{{ 'bool-warn' if c.endpoint_public_access else 'bool-yes' }}">{{ 'Yes' if c.endpoint_public_access else 'No' }}</span></div>
+      <div class="eks-meta-item">Secrets Encrypted: <span class="{{ 'bool-yes' if c.secrets_encrypted else 'bool-no' }}">{{ 'Yes' if c.secrets_encrypted else 'No' }}</span></div>
+      {% if logs %}
+      <div class="eks-meta-item">Logging: <span>{{ logs | join(', ') }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if clusters | length == 300 %}
+  <div style="text-align:center;color:#475569;font-size:12px;padding:12px 0;">
+    Showing first 300 results — refine your search to narrow results.
+  </div>
+  {% endif %}
+
+{% elif query %}
+  <div class="no-results">No clusters found matching "{{ query }}"</div>
+{% else %}
+  <div class="no-results">No EKS clusters found. Add <code>eks_collect = true</code> to accounts in config.ini and run collect_eks.py.</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* ── Fleet Summary collapse/expand ──────────────── */
+(function() {
+  var body     = document.getElementById('fleetSummaryBody');
+  var icon     = document.getElementById('fleetToggleIcon');
+  if (!body) return;
+  var expanded = true;
+  window.toggleFleetSummary = function() {
+    expanded = !expanded;
+    body.style.display = expanded ? '' : 'none';
+    icon.textContent   = expanded ? '▲' : '▼';
+  };
+})();
+
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.tag-popover').forEach(function(p) { p.remove(); });
+});
+
+/* ══════════════════════════════════════════════
+   Node History Chart
+══════════════════════════════════════════════ */
+{% if view == 'detail' and detail %}
+(function() {
+  var CLUSTER  = {{ detail.cluster.cluster_name | tojson }};
+  var ACCOUNT  = {{ detail.cluster.account_name  | tojson }};
+  var REGION   = {{ detail.cluster.region        | tojson }};
+  var BASE     = '/aws-inventory';
+
+  /* Colour palette — cycles if more series than colours */
+  var PALETTE = [
+    '#3b82f6','#10b981','#f59e0b','#8b5cf6',
+    '#ef4444','#06b6d4','#f97316','#6366f1',
+    '#ec4899','#84cc16','#14b8a6','#a855f7',
+  ];
+
+  var chartInstance = null;
+  var currentDays   = 30;
+  var currentGroup  = 'instance_type';
+
+  /* ── State setters called by toolbar buttons ── */
+  function setDays(d) {
+    currentDays = d;
+    document.querySelectorAll('#rangeToggle .toggle-btn').forEach(function(b) {
+      b.classList.toggle('active', parseInt(b.dataset.days) === d);
+    });
+    loadHistory();
+  }
+
+  function setGroupBy(g) {
+    currentGroup = g;
+    document.querySelectorAll('#groupToggle .toggle-btn').forEach(function(b) {
+      b.classList.toggle('active', b.dataset.group === g);
+    });
+    loadHistory();
+  }
+
+  /* Expose to onclick handlers */
+  window.setDays    = setDays;
+  window.setGroupBy = setGroupBy;
+
+  /* ── Fetch + render ── */
+  function loadHistory() {
+    document.getElementById('chartLoading').style.display  = 'flex';
+    document.getElementById('chartEmpty').style.display    = 'none';
+    document.getElementById('chartWrap').style.display     = 'none';
+    document.getElementById('historyStats').style.display  = 'none';
+    document.getElementById('seriesLegend').innerHTML      = '';
+
+    var url = BASE + '/eks/node-history'
+            + '?cluster='  + encodeURIComponent(CLUSTER)
+            + '&account='  + encodeURIComponent(ACCOUNT)
+            + '&region='   + encodeURIComponent(REGION)
+            + '&days='     + currentDays
+            + '&group_by=' + currentGroup;
+
+    fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) { renderChart(data); })
+      .catch(function(err) {
+        console.error('History fetch failed:', err);
+        document.getElementById('chartLoading').style.display = 'none';
+        document.getElementById('chartEmpty').style.display   = 'flex';
+      });
+  }
+
+  function renderChart(data) {
+    document.getElementById('chartLoading').style.display = 'none';
+
+    var series = data.series || [];
+    if (!series.length || !series[0].data.length) {
+      document.getElementById('chartEmpty').style.display = 'flex';
+      return;
+    }
+
+    /* Build unified sorted timestamp axis */
+    var tsSet = {};
+    series.forEach(function(s) {
+      s.data.forEach(function(d) { tsSet[d.t] = true; });
+    });
+    var labels = Object.keys(tsSet).sort();
+
+    /* Build stacked bar datasets — stacked = intuitive for "total nodes" view */
+    var datasets = series.map(function(s, i) {
+      var colour = PALETTE[i % PALETTE.length];
+      var byTs   = {};
+      s.data.forEach(function(d) { byTs[d.t] = d.count; });
+      return {
+        label:           s.label,
+        data:            labels.map(function(t) { return byTs[t] != null ? byTs[t] : 0; }),
+        backgroundColor: colour + 'cc',
+        borderColor:     colour,
+        borderWidth:     1,
+        hoverBackgroundColor: colour,
+      };
+    });
+
+    /* Populate summary stats */
+    var sm = data.summary || {};
+    document.getElementById('statCurrent').textContent = sm.current_total || 0;
+    document.getElementById('statPeak').textContent    = sm.period_peak   || 0;
+    document.getElementById('statAvg').textContent     = sm.period_avg    || 0;
+    document.getElementById('statPoints').textContent  = sm.data_points   || 0;
+    document.getElementById('historyStats').style.display = 'flex';
+
+    /* X-axis label formatter */
+    function fmtLabel(ts) {
+      var d = new Date(ts.replace(' ', 'T') + 'Z');
+      if (currentDays >= 90) {
+        return d.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'UTC'});
+      }
+      return d.toLocaleDateString('en-US', {month:'short', day:'numeric', timeZone:'UTC'})
+           + ' ' + d.toLocaleTimeString('en-US',
+               {hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'UTC'});
+    }
+
+    /* Destroy previous chart */
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+    document.getElementById('chartWrap').style.display = 'block';
+    var ctx = document.getElementById('nodeHistoryChart').getContext('2d');
+
+    chartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive:          true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a1d27',
+            borderColor:     '#2d3148',
+            borderWidth:     1,
+            titleColor:      '#94a3b8',
+            bodyColor:       '#cbd5e1',
+            maxHeight:       600,
+            bodyFont:        { size: 11 },
+            footerFont:      { size: 11, weight: 'bold' },
+            callbacks: {
+              title: function(items) {
+                return fmtLabel(items[0].label) + ' UTC';
+              },
+              label: function(item) {
+                if (item.raw === 0) return null;
+                return '  ' + item.dataset.label + ': ' + item.raw + ' node' + (item.raw !== 1 ? 's' : '');
+              },
+              footer: function(items) {
+                var total = items.reduce(function(s, i) { return s + (i.raw || 0); }, 0);
+                return 'Total: ' + total + ' nodes';
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              color:         '#475569',
+              maxTicksLimit: 10,
+              maxRotation:   0,
+              callback: function(val, idx) { return fmtLabel(labels[idx]); },
+            },
+            grid: { color: '#1e2130' },
+          },
+          y: {
+            stacked:     true,
+            beginAtZero: true,
+            ticks: {
+              color:     '#475569',
+              precision: 0,
+              stepSize:  1,
+            },
+            grid: { color: '#1e2130' },
+            title: {
+              display: true,
+              text:    'Node Count',
+              color:   '#475569',
+              font:    { size: 11 },
+            },
+          },
+        },
+      },
+    });
+
+    /* Custom legend */
+    var legend = document.getElementById('seriesLegend');
+    legend.innerHTML = '';
+    series.forEach(function(s, i) {
+      var colour = PALETTE[i % PALETTE.length];
+      var item   = document.createElement('div');
+      item.className = 'series-legend-item';
+      item.innerHTML = '<span class="series-legend-dot" style="background:' + colour + '"></span>'
+                     + s.label;
+      legend.appendChild(item);
+    });
+  }
+
+  /* Load Chart.js from cdnjs then kick off initial load */
+  var script    = document.createElement('script');
+  script.src    = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  script.onload = function() { loadHistory(); };
+  script.onerror = function() {
+    document.getElementById('chartLoading').style.display = 'none';
+    document.getElementById('chartEmpty').innerHTML =
+      '<div>Chart.js failed to load</div><small>Check network connectivity</small>';
+    document.getElementById('chartEmpty').style.display = 'flex';
+  };
+  document.head.appendChild(script);
+})();
+{% endif %}
+</script>
+{% endblock %}

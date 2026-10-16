@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block title %}Databases (RDS){% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Tabs ── */
+  .tab-bar { display:flex; gap:6px; margin-bottom:24px; border-bottom:1px solid #2d3148; padding-bottom:0; }
+  .tab-btn { padding:8px 18px; font-size:13px; font-weight:600; border-radius:8px 8px 0 0;
+             border:1px solid transparent; border-bottom:none; cursor:pointer;
+             color:#64748b; background:transparent; transition:all .15s; }
+  .tab-btn:hover { color:#cbd5e1; background:#1a1d27; }
+  .tab-btn.active { color:#f1f5f9; background:#141722; border-color:#2d3148; }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+
+  /* ── Search bar ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Cards ── */
+  .rds-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+              padding:18px 22px; margin-bottom:10px; transition:border-color .15s, background .15s; }
+  .rds-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .rds-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .rds-card-title { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .rds-card-sub   { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px; }
+  .rds-card-meta  { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .rds-meta-item  { font-size:12px; color:#64748b; }
+  .rds-meta-item span { color:#cbd5e1; }
+  .rds-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Engine badge ── */
+  .engine-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700;
+                  text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+  .engine-aurora-mysql     { background:#14352a; color:#6ee7b7; }
+  .engine-aurora-postgresql{ background:#1e2d4a; color:#93c5fd; }
+  .engine-mysql            { background:#2a2010; color:#fcd34d; }
+  .engine-postgres         { background:#1e2040; color:#a5b4fc; }
+  .engine-mariadb          { background:#2a1020; color:#f9a8d4; }
+  .engine-oracle           { background:#2a1a10; color:#fb923c; }
+  .engine-sqlserver        { background:#1a2a30; color:#67e8f9; }
+  .engine-default          { background:#1e2130; color:#94a3b8; }
+
+  /* ── Status badge ── */
+  .status-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:600; }
+  .status-available   { background:#14352a; color:#6ee7b7; }
+  .status-stopped     { background:#2a1010; color:#fca5a5; }
+  .status-starting    { background:#1e2d1e; color:#86efac; }
+  .status-stopping    { background:#2a2010; color:#fcd34d; }
+  .status-modifying   { background:#1e2040; color:#a5b4fc; }
+  .status-other       { background:#1e2130; color:#94a3b8; }
+
+  /* ── Boolean pills ── */
+  .bool-yes { color:#6ee7b7; font-weight:600; }
+  .bool-no  { color:#475569; }
+  .bool-warn { color:#fcd34d; font-weight:600; }
+
+  /* ── Detail view ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:13px; color:#64748b; margin-top:4px; font-family:monospace; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                  padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:13px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid { display:grid; grid-template-columns:180px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  .endpoint-box { background:#0f1117; border:1px solid #1e2130; border-radius:8px;
+                  padding:12px 16px; margin-bottom:10px; }
+  .endpoint-label { font-size:11px; font-weight:700; text-transform:uppercase;
+                    letter-spacing:.5px; color:#475569; margin-bottom:4px; }
+  .endpoint-value { font-size:14px; font-family:monospace; color:#a5f3fc; }
+  .endpoint-port  { font-size:12px; color:#64748b; margin-top:3px; }
+
+  .sg-chip { display:inline-block; padding:3px 10px; margin:3px 4px 3px 0;
+             background:#1a1d27; border:1px solid #2d3148; border-radius:6px;
+             font-size:12px; font-family:monospace; color:#c4b5fd; }
+  .sg-chip a { color:#c4b5fd; text-decoration:none; }
+  .sg-chip a:hover { text-decoration:underline; }
+
+  .member-row { display:flex; align-items:center; gap:10px; padding:8px 0;
+                border-bottom:1px solid #1e2130; }
+  .member-row:last-child { border-bottom:none; }
+  .member-writer { background:#14352a; color:#6ee7b7; padding:1px 7px;
+                   border-radius:4px; font-size:10px; font-weight:700; }
+  .member-reader { background:#1e2d4a; color:#93c5fd; padding:1px 7px;
+                   border-radius:4px; font-size:10px; font-weight:700; }
+
+  .instance-link-row { display:flex; align-items:center; gap:10px; padding:8px 12px;
+                       background:#0f1117; border-radius:7px; margin-bottom:6px; }
+  .instance-link-row a { color:#7dd3fc; text-decoration:none; font-family:monospace; font-size:13px; }
+  .instance-link-row a:hover { text-decoration:underline; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('rds_clusters', 0) }}</span><span class="stat-lbl">Clusters</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('rds_instances', 0) }}</span><span class="stat-lbl">Instances</span></div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW — Cluster
+════════════════════════════════════════════════════ -->
+{% if view == 'cluster_detail' and cluster %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/rds">Databases</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/rds?q={{ query }}&tab=clusters">Clusters</a><span>›</span>{% endif %}
+  {{ cluster.cluster_id }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ cluster.cluster_id }}</div>
+    <span class="engine-badge engine-{{ cluster.engine | replace('-','_') | replace(' ','_') }}">{{ cluster.engine }}</span>
+    <span class="status-badge status-{{ cluster.status if cluster.status in ['available','stopped','starting','stopping','modifying'] else 'other' }}">{{ cluster.status }}</span>
+  </div>
+  <div class="detail-sub">{{ cluster.cluster_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ cluster.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ cluster.region }}</span></div>
+    <div class="detail-meta-item">Engine Version: <span>{{ cluster.engine_version }}</span></div>
+    <div class="detail-meta-item">Mode: <span>{{ cluster.engine_mode }}</span></div>
+    <div class="detail-meta-item">Port: <span class="mono">{{ cluster.port }}</span></div>
+  </div>
+  {% if cluster.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ cluster.tags | tojson }}'>
+      🏷 {{ cluster.tags | length }} tags
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Endpoints -->
+<div class="section-card">
+  <div class="section-title">Endpoints</div>
+  {% if cluster.endpoint %}
+  <div class="endpoint-box">
+    <div class="endpoint-label">Writer Endpoint</div>
+    <div class="endpoint-value">{{ cluster.endpoint }}</div>
+    <div class="endpoint-port">Port {{ cluster.port }}</div>
+  </div>
+  {% endif %}
+  {% if cluster.reader_endpoint %}
+  <div class="endpoint-box">
+    <div class="endpoint-label">Reader Endpoint</div>
+    <div class="endpoint-value">{{ cluster.reader_endpoint }}</div>
+    <div class="endpoint-port">Port {{ cluster.port }}</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Configuration -->
+<div class="section-card">
+  <div class="section-title">Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">VPC</div>
+    <div class="kv-value">{{ cluster.vpc_id or '—' }}</div>
+    <div class="kv-label">Subnet Group</div>
+    <div class="kv-value">{{ cluster.subnet_group or '—' }}</div>
+    <div class="kv-label">Parameter Group</div>
+    <div class="kv-value">{{ cluster.parameter_group or '—' }}</div>
+    <div class="kv-label">Multi-AZ</div>
+    <div class="kv-value">
+      {% if cluster.multi_az %}<span class="bool-yes">✔ Yes</span>
+      {% else %}<span class="bool-no">No</span>{% endif %}
+    </div>
+    <div class="kv-label">Deletion Protection</div>
+    <div class="kv-value">
+      {% if cluster.deletion_protection %}<span class="bool-yes">✔ Enabled</span>
+      {% else %}<span class="bool-warn">⚠ Disabled</span>{% endif %}
+    </div>
+    <div class="kv-label">Storage Encrypted</div>
+    <div class="kv-value">
+      {% if cluster.storage_encrypted %}<span class="bool-yes">✔ Yes</span>
+      {% else %}<span class="bool-warn">⚠ No</span>{% endif %}
+    </div>
+    <div class="kv-label">IAM Auth</div>
+    <div class="kv-value">
+      {% if cluster.iam_auth_enabled %}<span class="bool-yes">✔ Enabled</span>
+      {% else %}<span class="bool-no">Disabled</span>{% endif %}
+    </div>
+    <div class="kv-label">Backup Retention</div>
+    <div class="kv-value">{{ cluster.backup_retention_days }} days</div>
+    <div class="kv-label">Backup Window</div>
+    <div class="kv-value">{{ cluster.preferred_backup_window or '—' }}</div>
+    <div class="kv-label">Maintenance Window</div>
+    <div class="kv-value">{{ cluster.preferred_maint_window or '—' }}</div>
+    <div class="kv-label">Master Username</div>
+    <div class="kv-value">{{ cluster.master_username or '—' }}</div>
+    <div class="kv-label">Database Name</div>
+    <div class="kv-value">{{ cluster.database_name or '—' }}</div>
+    <div class="kv-label">Created</div>
+    <div class="kv-value">{{ cluster.created_at or '—' }}</div>
+  </div>
+</div>
+
+<!-- Security Groups -->
+{% set sgs = cluster.security_groups | fromjson if cluster.security_groups else [] %}
+{% if sgs %}
+<div class="section-card">
+  <div class="section-title">Security Groups</div>
+  {% for sg in sgs %}
+  <span class="sg-chip">
+    <a href="/aws-inventory/sg?sg_id={{ sg.id }}&account={{ cluster.account_name }}">{{ sg.id }}</a>
+    <span style="color:#475569;"> — {{ sg.status }}</span>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Cluster Members -->
+{% set members = cluster.db_cluster_members | fromjson if cluster.db_cluster_members else [] %}
+{% if members %}
+<div class="section-card">
+  <div class="section-title">Cluster Instances ({{ members | length }})</div>
+  {% for m in members %}
+  <div class="instance-link-row">
+    <span class="{{ 'member-writer' if m.is_writer else 'member-reader' }}">
+      {{ 'WRITER' if m.is_writer else 'READER' }}
+    </span>
+    <a href="/aws-inventory/rds?instance_id={{ m.instance_id }}&account={{ cluster.account_name }}&q={{ query }}">
+      {{ m.instance_id }}
+    </a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW — Instance
+════════════════════════════════════════════════════ -->
+{% elif view == 'instance_detail' and instance %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/rds">Databases</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/rds?q={{ query }}&tab=instances">Instances</a><span>›</span>{% endif %}
+  {{ instance.instance_id }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ instance.instance_id }}</div>
+    <span class="engine-badge engine-{{ instance.engine | replace('-','_') | replace(' ','_') }}">{{ instance.engine }}</span>
+    <span class="status-badge status-{{ instance.status if instance.status in ['available','stopped','starting','stopping','modifying'] else 'other' }}">{{ instance.status }}</span>
+    {% if instance.publicly_accessible %}
+    <span style="background:#2a1010;color:#fca5a5;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">PUBLIC</span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ instance.instance_arn }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ instance.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ instance.region }}</span></div>
+    <div class="detail-meta-item">Class: <span>{{ instance.instance_class }}</span></div>
+    <div class="detail-meta-item">Engine: <span>{{ instance.engine }} {{ instance.engine_version }}</span></div>
+    {% if instance.cluster_id %}
+    <div class="detail-meta-item">Cluster: <span>
+      <a href="/aws-inventory/rds?cluster_id={{ instance.cluster_id }}&account={{ instance.account_name }}" style="color:#7dd3fc;text-decoration:none;">{{ instance.cluster_id }}</a>
+    </span></div>
+    {% endif %}
+  </div>
+  {% if instance.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ instance.tags | tojson }}'>
+      🏷 {{ instance.tags | length }} tags
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Endpoint -->
+<div class="section-card">
+  <div class="section-title">Endpoint</div>
+  {% if instance.endpoint %}
+  <div class="endpoint-box">
+    <div class="endpoint-label">Connection Endpoint</div>
+    <div class="endpoint-value">{{ instance.endpoint }}</div>
+    <div class="endpoint-port">Port {{ instance.port }}</div>
+  </div>
+  {% else %}
+  <div style="color:#475569;font-size:13px;">No endpoint (instance may be part of a cluster)</div>
+  {% endif %}
+</div>
+
+<!-- Configuration -->
+<div class="section-card">
+  <div class="section-title">Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">Instance Class</div>
+    <div class="kv-value">{{ instance.instance_class }}</div>
+    <div class="kv-label">VPC</div>
+    <div class="kv-value">{{ instance.vpc_id or '—' }}</div>
+    <div class="kv-label">Subnet Group</div>
+    <div class="kv-value">{{ instance.subnet_group or '—' }}</div>
+    <div class="kv-label">Parameter Group</div>
+    <div class="kv-value">{{ instance.parameter_group or '—' }}</div>
+    <div class="kv-label">Multi-AZ</div>
+    <div class="kv-value">{% if instance.multi_az %}<span class="bool-yes">✔ Yes</span>{% else %}<span class="bool-no">No</span>{% endif %}</div>
+    <div class="kv-label">Publicly Accessible</div>
+    <div class="kv-value">{% if instance.publicly_accessible %}<span class="bool-warn">⚠ Yes</span>{% else %}<span class="bool-yes">✔ No</span>{% endif %}</div>
+    <div class="kv-label">Storage Type</div>
+    <div class="kv-value">{{ instance.storage_type }}</div>
+    <div class="kv-label">Storage Size</div>
+    <div class="kv-value">{{ instance.storage_gb }} GB{% if instance.iops %} / {{ instance.iops }} IOPS{% endif %}</div>
+    <div class="kv-label">Storage Encrypted</div>
+    <div class="kv-value">{% if instance.storage_encrypted %}<span class="bool-yes">✔ Yes</span>{% else %}<span class="bool-warn">⚠ No</span>{% endif %}</div>
+    <div class="kv-label">Deletion Protection</div>
+    <div class="kv-value">{% if instance.deletion_protection %}<span class="bool-yes">✔ Enabled</span>{% else %}<span class="bool-warn">⚠ Disabled</span>{% endif %}</div>
+    <div class="kv-label">Performance Insights</div>
+    <div class="kv-value">{% if instance.performance_insights %}<span class="bool-yes">✔ Enabled</span>{% else %}<span class="bool-no">Disabled</span>{% endif %}</div>
+    <div class="kv-label">IAM Auth</div>
+    <div class="kv-value">{% if instance.iam_auth_enabled %}<span class="bool-yes">✔ Enabled</span>{% else %}<span class="bool-no">Disabled</span>{% endif %}</div>
+    <div class="kv-label">CA Certificate</div>
+    <div class="kv-value">{{ instance.ca_certificate or '—' }}</div>
+    <div class="kv-label">Auto Minor Upgrades</div>
+    <div class="kv-value">{% if instance.auto_minor_upgrade %}<span class="bool-yes">✔ Yes</span>{% else %}<span class="bool-no">No</span>{% endif %}</div>
+    <div class="kv-label">Backup Retention</div>
+    <div class="kv-value">{{ instance.backup_retention_days }} days</div>
+    <div class="kv-label">Backup Window</div>
+    <div class="kv-value">{{ instance.preferred_backup_window or '—' }}</div>
+    <div class="kv-label">Maintenance Window</div>
+    <div class="kv-value">{{ instance.preferred_maint_window or '—' }}</div>
+    <div class="kv-label">Master Username</div>
+    <div class="kv-value">{{ instance.master_username or '—' }}</div>
+    <div class="kv-label">Database Name</div>
+    <div class="kv-value">{{ instance.database_name or '—' }}</div>
+    {% if instance.replica_source %}
+    <div class="kv-label">Replica Source</div>
+    <div class="kv-value">{{ instance.replica_source }}</div>
+    {% endif %}
+    <div class="kv-label">Created</div>
+    <div class="kv-value">{{ instance.created_at or '—' }}</div>
+  </div>
+</div>
+
+<!-- Security Groups -->
+{% set sgs = instance.security_groups | fromjson if instance.security_groups else [] %}
+{% if sgs %}
+<div class="section-card">
+  <div class="section-title">Security Groups</div>
+  {% for sg in sgs %}
+  <span class="sg-chip">
+    <a href="/aws-inventory/sg?sg_id={{ sg.id }}&account={{ instance.account_name }}">{{ sg.id }}</a>
+    <span style="color:#475569;"> — {{ sg.status }}</span>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+<div class="tab-bar">
+  <button class="tab-btn {% if active_tab == 'clusters' %}active{% endif %}"
+          onclick="switchTab('clusters')">Aurora Clusters</button>
+  <button class="tab-btn {% if active_tab == 'instances' %}active{% endif %}"
+          onclick="switchTab('instances')">DB Instances</button>
+</div>
+
+<!-- ── Clusters Tab ── -->
+<div id="tab-clusters" class="tab-pane {% if active_tab == 'clusters' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/rds">
+    <input type="hidden" name="tab" value="clusters">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}" placeholder="Search cluster ID, engine, endpoint, VPC, account…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if clusters %}
+    {% for c in clusters %}
+    {% set engine_cls = c.engine | replace('-','_') | replace(' ','_') %}
+    <div class="rds-card">
+      <div class="rds-card-header">
+        <div>
+          <div class="rds-card-title">{{ c.cluster_id }}</div>
+          <div class="rds-card-sub">{{ c.endpoint or 'No endpoint' }}{% if c.port %} :{{ c.port }}{% endif %}</div>
+        </div>
+        <span class="engine-badge engine-{{ engine_cls }}">{{ c.engine }}</span>
+        <span class="status-badge status-{{ c.status if c.status in ['available','stopped','starting','stopping','modifying'] else 'other' }}">{{ c.status }}</span>
+        <div class="rds-card-actions">
+          <a class="btn-detail" href="/aws-inventory/rds?cluster_id={{ c.cluster_id }}&account={{ c.account_name }}&q={{ query }}">Details →</a>
+        </div>
+      </div>
+      <div class="rds-card-meta">
+        <div class="rds-meta-item">Account: <span>{{ c.account_name }}</span></div>
+        <div class="rds-meta-item">Region: <span>{{ c.region }}</span></div>
+        <div class="rds-meta-item">Version: <span>{{ c.engine_version }}</span></div>
+        <div class="rds-meta-item">Mode: <span>{{ c.engine_mode }}</span></div>
+        <div class="rds-meta-item">VPC: <span class="mono">{{ c.vpc_id or '—' }}</span></div>
+        <div class="rds-meta-item">Multi-AZ: <span class="{{ 'bool-yes' if c.multi_az else 'bool-no' }}">{{ 'Yes' if c.multi_az else 'No' }}</span></div>
+        <div class="rds-meta-item">Deletion Protection: <span class="{{ 'bool-yes' if c.deletion_protection else 'bool-warn' }}">{{ 'On' if c.deletion_protection else 'Off' }}</span></div>
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No clusters found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No Aurora clusters found across all accounts.</div>
+  {% endif %}
+</div>
+
+<!-- ── Instances Tab ── -->
+<div id="tab-instances" class="tab-pane {% if active_tab == 'instances' %}active{% endif %}">
+  <form method="get" action="/aws-inventory/rds">
+    <input type="hidden" name="tab" value="instances">
+    <div class="search-row">
+      <input type="text" name="q" value="{{ query }}" placeholder="Search instance ID, engine, endpoint, VPC, class, account…">
+      <button type="submit">Search</button>
+    </div>
+  </form>
+
+  {% if instances %}
+    {% for inst in instances %}
+    {% set engine_cls = inst.engine | replace('-','_') | replace(' ','_') %}
+    <div class="rds-card">
+      <div class="rds-card-header">
+        <div>
+          <div class="rds-card-title">{{ inst.instance_id }}</div>
+          <div class="rds-card-sub">{{ inst.endpoint or '—' }}{% if inst.port %} :{{ inst.port }}{% endif %}</div>
+        </div>
+        <span class="engine-badge engine-{{ engine_cls }}">{{ inst.engine }}</span>
+        <span class="status-badge status-{{ inst.status if inst.status in ['available','stopped','starting','stopping','modifying'] else 'other' }}">{{ inst.status }}</span>
+        {% if inst.publicly_accessible %}
+        <span style="background:#2a1010;color:#fca5a5;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">PUBLIC</span>
+        {% endif %}
+        <div class="rds-card-actions">
+          <a class="btn-detail" href="/aws-inventory/rds?instance_id={{ inst.instance_id }}&account={{ inst.account_name }}&q={{ query }}">Details →</a>
+        </div>
+      </div>
+      <div class="rds-card-meta">
+        <div class="rds-meta-item">Account: <span>{{ inst.account_name }}</span></div>
+        <div class="rds-meta-item">Region: <span>{{ inst.region }}</span></div>
+        <div class="rds-meta-item">Class: <span>{{ inst.instance_class }}</span></div>
+        <div class="rds-meta-item">Version: <span>{{ inst.engine_version }}</span></div>
+        <div class="rds-meta-item">VPC: <span class="mono">{{ inst.vpc_id or '—' }}</span></div>
+        <div class="rds-meta-item">Storage: <span>{{ inst.storage_gb }} GB ({{ inst.storage_type }})</span></div>
+        <div class="rds-meta-item">Multi-AZ: <span class="{{ 'bool-yes' if inst.multi_az else 'bool-no' }}">{{ 'Yes' if inst.multi_az else 'No' }}</span></div>
+        {% if inst.cluster_id %}
+        <div class="rds-meta-item">Cluster: <span>{{ inst.cluster_id }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% elif query %}
+    <div class="no-results">No instances found matching "{{ query }}"</div>
+  {% else %}
+    <div class="no-results">No standalone DB instances found across all accounts.</div>
+  {% endif %}
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+{% endif %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+
+  document.body.appendChild(pop);
+
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+
+document.addEventListener('click', () => {
+  document.querySelectorAll('.tag-popover').forEach(p => p.remove());
+});
+</script>
+{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block title %}EFS File Systems{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Search ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── EFS card ── */
+  .efs-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+              padding:16px 20px; margin-bottom:10px;
+              transition:border-color .15s, background .15s; }
+  .efs-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .efs-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .efs-card-title { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .efs-card-sub   { font-size:12px; color:#64748b; font-family:monospace; margin-top:2px; }
+  .efs-card-meta  { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .efs-meta-item  { font-size:12px; color:#64748b; }
+  .efs-meta-item span { color:#cbd5e1; }
+  .efs-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── State badge ── */
+  .state-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .state-available  { background:#14352a; color:#6ee7b7; }
+  .state-creating   { background:#1e2d1e; color:#86efac; }
+  .state-updating   { background:#1e2040; color:#a5b4fc; }
+  .state-deleting   { background:#2a1010; color:#fca5a5; }
+  .state-deleted    { background:#1e1e1e; color:#475569; }
+  .state-other      { background:#1e2130; color:#94a3b8; }
+
+  /* ── Throughput badge ── */
+  .tp-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700;
+              white-space:nowrap; background:#1e2040; color:#a5b4fc; }
+
+  /* ── Bool pills ── */
+  .bool-yes  { color:#6ee7b7; font-weight:600; }
+  .bool-no   { color:#475569; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:12px; color:#64748b; font-family:monospace; margin-top:4px; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:220px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Storage bar ── */
+  .storage-layout { display:grid; grid-template-columns:260px 1fr; gap:24px; align-items:start; }
+  @media (max-width:720px) { .storage-layout { grid-template-columns:1fr; } }
+
+  .pie-wrap { position:relative; width:220px; height:220px; margin:0 auto; }
+  .pie-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+                text-align:center; pointer-events:none; }
+  .pie-center-size  { font-size:18px; font-weight:700; color:#f1f5f9; }
+  .pie-center-label { font-size:11px; color:#64748b; margin-top:2px; }
+
+  .storage-legend { display:flex; flex-direction:column; gap:8px; }
+  .legend-row  { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .legend-dot  { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+  .legend-name { color:#cbd5e1; flex:1; }
+  .legend-size { color:#94a3b8; font-family:monospace; white-space:nowrap; }
+  .legend-pct  { color:#475569; font-size:11px; white-space:nowrap; min-width:36px; text-align:right; }
+
+  /* ── Mount targets table ── */
+  .mt-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .mt-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.5px; color:#475569; padding:0 12px 10px 0; border-bottom:1px solid #1e2130; }
+  .mt-table td { padding:9px 12px 9px 0; border-bottom:1px solid #1e2130;
+                 color:#cbd5e1; font-family:monospace; vertical-align:top; }
+  .mt-table tr:last-child td { border-bottom:none; }
+  .mt-table td.dim { color:#475569; font-size:12px; }
+
+  .mt-state-available { color:#6ee7b7; }
+  .mt-state-other     { color:#94a3b8; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('efs_filesystems', 0) }}</span><span class="stat-lbl">File Systems</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('efs_total_gb', 0) }} GB</span><span class="stat-lbl">Total Storage</span></div>
+{% endblock %}
+
+{% block content %}
+
+{# ── Size formatting macro ── #}
+{% macro fmt_bytes(b) %}
+  {%- if b >= 1099511627776 -%}{{ '%.2f TB' % (b / 1099511627776) }}
+  {%- elif b >= 1073741824  -%}{{ '%.2f GB' % (b / 1073741824) }}
+  {%- elif b >= 1048576     -%}{{ '%.1f MB' % (b / 1048576) }}
+  {%- elif b > 0            -%}{{ b }} B
+  {%- else                  -%}—
+  {%- endif %}
+{% endmacro %}
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW
+════════════════════════════════════════════════════ -->
+{% if view == 'detail' and detail %}
+{% set fs = detail.fs %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/efs">EFS File Systems</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/efs?q={{ query }}">Results</a><span>›</span>{% endif %}
+  {{ fs.name or fs.fs_id }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ fs.name or fs.fs_id }}</div>
+    {% set sc = fs.lifecycle_state | lower %}
+    <span class="state-badge state-{{ sc if sc in ['available','creating','updating','deleting','deleted'] else 'other' }}">
+      {{ fs.lifecycle_state }}
+    </span>
+    <span class="tp-badge">{{ fs.throughput_mode | title }}</span>
+    {% if fs.encrypted %}
+    <span style="background:#1e2a14;color:#86efac;padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">🔐 Encrypted</span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ fs.fs_id }} — {{ fs.dns_name }}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ fs.account_name }}</span></div>
+    <div class="detail-meta-item">Region: <span>{{ fs.region }}</span></div>
+    <div class="detail-meta-item">Performance Mode: <span>{{ fs.performance_mode | replace('Max','Max ') | title }}</span></div>
+    <div class="detail-meta-item">Mount Targets: <span>{{ fs.number_of_mount_targets }}</span></div>
+    <div class="detail-meta-item">Total Size: <span>{{ fmt_bytes(fs.size_bytes_total) }}</span></div>
+    {% if fs.created_at %}
+    <div class="detail-meta-item">Created: <span>{{ fs.created_at.strftime('%Y-%m-%d') }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Storage Breakdown -->
+<div class="section-card">
+  <div class="section-title">Storage Breakdown</div>
+  {% set has_breakdown = fs.size_bytes_standard > 0 or fs.size_bytes_ia > 0 or fs.size_bytes_archive > 0 %}
+  {% if has_breakdown %}
+  {% set breakdown = [
+    ("Standard",   fs.size_bytes_standard, "#3b82f6"),
+    ("Infrequent Access", fs.size_bytes_ia, "#22d3ee"),
+    ("Archive",    fs.size_bytes_archive,  "#a78bfa"),
+  ] | selectattr("1", "gt", 0) | list %}
+
+  <div class="storage-layout">
+    <div>
+      <div class="pie-wrap">
+        <canvas id="efsPie" width="220" height="220"></canvas>
+        <div class="pie-center">
+          <div class="pie-center-size">{{ fmt_bytes(fs.size_bytes_total) }}</div>
+          <div class="pie-center-label">total</div>
+        </div>
+      </div>
+    </div>
+    <div class="storage-legend">
+      {% for label, size, color in breakdown %}
+      <div class="legend-row">
+        <div class="legend-dot" style="background:{{ color }}"></div>
+        <span class="legend-name">{{ label }}</span>
+        <span class="legend-size">{{ fmt_bytes(size) }}</span>
+        <span class="legend-pct">{{ '%.1f' % (size / fs.size_bytes_total * 100) }}%</span>
+      </div>
+      {% endfor %}
+      {% if fs.provisioned_throughput %}
+      <div style="margin-top:16px;font-size:12px;color:#64748b;">
+        Provisioned Throughput: <span style="color:#cbd5e1;">{{ fs.provisioned_throughput }} MiB/s</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var slices = [
+      {% for label, size, color in breakdown %}
+      { size: {{ size }}, color: "{{ color }}" },
+      {% endfor %}
+    ];
+    var total = slices.reduce(function(s, r) { return s + r.size; }, 0);
+    var canvas = document.getElementById('efsPie');
+    var ctx    = canvas.getContext('2d');
+    var cx = 110, cy = 110, ro = 95, ri = 60;
+    var TAU = 2 * Math.PI, gap = 0.025;
+    var start = -Math.PI / 2;
+
+    slices.forEach(function(s) {
+      var sweep = (s.size / total) * TAU - gap;
+      ctx.beginPath();
+      ctx.moveTo(cx + ro * Math.cos(start), cy + ro * Math.sin(start));
+      ctx.arc(cx, cy, ro, start, start + sweep);
+      ctx.arc(cx, cy, ri, start + sweep, start, true);
+      ctx.closePath();
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      start += sweep + gap;
+    });
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri - 2, 0, TAU);
+    ctx.fillStyle = '#141722';
+    ctx.fill();
+  })();
+  </script>
+
+  {% elif fs.size_bytes_total > 0 %}
+  <div class="kv-grid">
+    <div class="kv-label">Total Size</div>
+    <div class="kv-value">{{ fmt_bytes(fs.size_bytes_total) }}</div>
+  </div>
+  <p style="color:#475569;font-size:12px;margin-top:10px;">
+    Per-tier breakdown not available for this file system.
+  </p>
+  {% else %}
+  <div style="color:#475569;font-size:13px;padding:16px 0;">
+    No storage data available — file system may be empty.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Configuration -->
+<div class="section-card">
+  <div class="section-title">Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">File System ID</div>
+    <div class="kv-value">{{ fs.fs_id }}</div>
+    <div class="kv-label">Performance Mode</div>
+    <div class="kv-value">{{ fs.performance_mode }}</div>
+    <div class="kv-label">Throughput Mode</div>
+    <div class="kv-value">{{ fs.throughput_mode | title }}
+      {% if fs.provisioned_throughput %} — {{ fs.provisioned_throughput }} MiB/s{% endif %}
+    </div>
+    <div class="kv-label">Encryption</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if fs.encrypted else 'bool-no' }}">
+        {{ 'Enabled' if fs.encrypted else 'Disabled' }}
+      </span>
+    </div>
+    {% if fs.kms_key_id %}
+    <div class="kv-label">KMS Key</div>
+    <div class="kv-value">{{ fs.kms_key_id }}</div>
+    {% endif %}
+    {% if fs.availability_zone %}
+    <div class="kv-label">Availability Zone</div>
+    <div class="kv-value">{{ fs.availability_zone }}</div>
+    {% endif %}
+    <div class="kv-label">DNS Name</div>
+    <div class="kv-value">{{ fs.dns_name }}</div>
+    {% if fs.fs_arn %}
+    <div class="kv-label">ARN</div>
+    <div class="kv-value">{{ fs.fs_arn }}</div>
+    {% endif %}
+    <div class="kv-label">Last Collected</div>
+    <div class="kv-value">{{ fs.last_seen }}</div>
+  </div>
+</div>
+
+<!-- Mount Targets -->
+{% if detail.mount_targets %}
+<div class="section-card">
+  <div class="section-title">Mount Targets ({{ detail.mount_targets | length }})</div>
+  <table class="mt-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>AZ</th>
+        <th>IP Address</th>
+        <th>Subnet</th>
+        <th>VPC</th>
+        <th>DNS Name</th>
+        <th>State</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mt in detail.mount_targets %}
+      <tr>
+        <td>{{ mt.mount_target_id }}</td>
+        <td>{{ mt.availability_zone or '—' }}</td>
+        <td>{{ mt.ip_address or '—' }}</td>
+        <td class="dim">{{ mt.subnet_id or '—' }}</td>
+        <td class="dim">{{ mt.vpc_id or '—' }}</td>
+        <td class="dim" style="font-size:11px;">{{ mt.dns_name or '—' }}</td>
+        <td>
+          <span class="mt-state-{{ 'available' if mt.lifecycle_state == 'available' else 'other' }}">
+            {{ mt.lifecycle_state }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if detail.tags %}
+<!-- Tags -->
+<div class="section-card">
+  <div class="section-title">Tags ({{ detail.tags | length }})</div>
+  <div class="kv-grid">
+    {% for tag in detail.tags %}
+    <div class="kv-label">{{ tag.k }}</div>
+    <div class="kv-value">{{ tag.v or '—' }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+{% if error %}
+<div class="error-msg">{{ error }}</div>
+{% endif %}
+
+<form method="get" action="/aws-inventory/efs">
+  <div class="search-row">
+    <input type="text" name="q" value="{{ query }}"
+           placeholder="Search file system ID, name, account, region, DNS…" autofocus>
+    <button type="submit">Search</button>
+  </div>
+</form>
+
+{% if filesystems %}
+  {% for fs in filesystems %}
+  {% set sc = fs.lifecycle_state | lower %}
+  <div class="efs-card">
+    <div class="efs-card-header">
+      <div style="flex:1;min-width:0;">
+        <div class="efs-card-title">{{ fs.name or fs.fs_id }}</div>
+        <div class="efs-card-sub">{{ fs.fs_id }} — {{ fs.dns_name }}</div>
+      </div>
+      <span class="state-badge state-{{ sc if sc in ['available','creating','updating','deleting','deleted'] else 'other' }}">
+        {{ fs.lifecycle_state }}
+      </span>
+      <span class="tp-badge">{{ fs.throughput_mode | title }}</span>
+      <div class="efs-card-actions">
+        <a class="btn-detail"
+           href="/aws-inventory/efs?fs_id={{ fs.fs_id }}&account={{ fs.account_name }}{% if query %}&q={{ query }}{% endif %}">
+          Details →
+        </a>
+      </div>
+    </div>
+    <div class="efs-card-meta">
+      <div class="efs-meta-item">Account: <span>{{ fs.account_name }}</span></div>
+      <div class="efs-meta-item">Region: <span>{{ fs.region }}</span></div>
+      <div class="efs-meta-item">Size: <span>{{ fmt_bytes(fs.size_bytes_total) }}</span></div>
+      {% if fs.size_bytes_ia > 0 %}
+      <div class="efs-meta-item">IA: <span>{{ fmt_bytes(fs.size_bytes_ia) }}</span></div>
+      {% endif %}
+      {% if fs.size_bytes_archive > 0 %}
+      <div class="efs-meta-item">Archive: <span>{{ fmt_bytes(fs.size_bytes_archive) }}</span></div>
+      {% endif %}
+      <div class="efs-meta-item">Mount Targets: <span>{{ fs.number_of_mount_targets }}</span></div>
+      <div class="efs-meta-item">Performance: <span>{{ fs.performance_mode }}</span></div>
+      <div class="efs-meta-item">Encrypted: <span class="{{ 'bool-yes' if fs.encrypted else 'bool-no' }}">{{ 'Yes' if fs.encrypted else 'No' }}</span></div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if filesystems | length == 500 %}
+  <div style="text-align:center;color:#475569;font-size:12px;padding:12px 0;">
+    Showing first 500 results — refine your search to narrow results.
+  </div>
+  {% endif %}
+
+{% elif query %}
+  <div class="no-results">No file systems found matching "{{ query }}"</div>
+{% else %}
+  <div class="no-results">No EFS file systems found. Run collect_efs.py to populate.</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.tag-popover').forEach(function(p) { p.remove(); });
+});
+</script>
+{% endblock %}

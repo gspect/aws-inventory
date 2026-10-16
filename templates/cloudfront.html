@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+{% block title %}CloudFront{% endblock %}
+
+{% block head %}
+<style>
+  /* ── Breadcrumb ── */
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  /* ── Search ── */
+  .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  .search-row input { flex:1; min-width:200px; padding:9px 14px; background:#141722;
+                      border:1px solid #2d3148; border-radius:8px; color:#f1f5f9; font-size:13px; }
+  .search-row input:focus { outline:none; border-color:#3d4468; }
+  .search-row button { padding:9px 20px; background:#1e3a5f; color:#93c5fd;
+                       border:1px solid #1e4976; border-radius:8px; font-size:13px;
+                       font-weight:600; cursor:pointer; transition:background .15s; }
+  .search-row button:hover { background:#1e4976; }
+
+  /* ── Distribution card ── */
+  .cf-card { background:#141722; border:1px solid #2d3148; border-radius:10px;
+             padding:16px 20px; margin-bottom:10px;
+             transition:border-color .15s, background .15s; }
+  .cf-card:hover { border-color:#3d4468; background:#1a1d27; }
+  .cf-card-header { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .cf-card-title  { font-size:15px; font-weight:600; color:#f1f5f9; font-family:monospace; }
+  .cf-card-sub    { font-size:12px; color:#64748b; margin-top:2px; }
+  .cf-card-meta   { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px; }
+  .cf-meta-item   { font-size:12px; color:#64748b; }
+  .cf-meta-item span { color:#cbd5e1; }
+  .cf-card-actions { margin-left:auto; }
+
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd;
+                border:1px solid #1e4976; border-radius:6px; font-size:12px;
+                font-weight:600; text-decoration:none; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+
+  /* ── Status badges ── */
+  .status-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .status-deployed   { background:#14352a; color:#6ee7b7; }
+  .status-inprogress { background:#1e2040; color:#a5b4fc; }
+  .status-other      { background:#1e2130; color:#94a3b8; }
+
+  /* ── Cert badge ── */
+  .cert-badge { padding:2px 9px; border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .cert-acm        { background:#1e2a14; color:#86efac; }
+  .cert-cloudfront { background:#1e2130; color:#94a3b8; }
+  .cert-iam        { background:#1e2040; color:#a5b4fc; }
+
+  /* ── WAF badge ── */
+  .waf-badge { background:#2a1f0a; color:#fb923c; padding:2px 9px;
+               border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+
+  /* ── Disabled badge ── */
+  .disabled-badge { background:#2a1010; color:#fca5a5; padding:2px 9px;
+                    border-radius:5px; font-size:11px; font-weight:700; white-space:nowrap; }
+
+  /* ── Bool pills ── */
+  .bool-yes  { color:#6ee7b7; font-weight:600; }
+  .bool-no   { color:#475569; }
+  .bool-warn { color:#fb923c; font-weight:600; }
+
+  /* ── CNAME chips ── */
+  .alias-chip { display:inline-block; padding:3px 10px; margin:2px 4px 2px 0;
+                background:#1a2a3a; border:1px solid #1e4060; border-radius:6px;
+                font-size:12px; font-family:monospace; color:#7dd3fc; }
+
+  /* ── Net chips ── */
+  .net-chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0;
+              background:#1a1d27; border:1px solid #2d3148; border-radius:5px;
+              font-size:11px; font-family:monospace; color:#94a3b8; }
+
+  /* ── Detail layout ── */
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; font-family:monospace; }
+  .detail-sub    { font-size:12px; color:#64748b; margin-top:4px; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .section-card  { background:#141722; border:1px solid #2d3148; border-radius:10px;
+                   padding:18px 22px; margin-bottom:16px; }
+  .section-title { font-size:12px; font-weight:700; text-transform:uppercase;
+                   letter-spacing:.6px; color:#475569; margin-bottom:14px; }
+
+  .kv-grid  { display:grid; grid-template-columns:220px 1fr; gap:8px 14px; }
+  .kv-label { font-size:12px; color:#475569; }
+  .kv-value { font-size:13px; color:#cbd5e1; font-family:monospace; word-break:break-all; }
+
+  /* ── Origins table ── */
+  .origin-card { background:#0f1117; border:1px solid #1e2130; border-radius:8px;
+                 padding:14px 16px; margin-bottom:8px; }
+  .origin-domain { font-size:14px; font-weight:600; color:#a5f3fc;
+                   font-family:monospace; word-break:break-all; }
+  .origin-meta   { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; }
+  .origin-meta-item { font-size:12px; color:#64748b; }
+  .origin-meta-item span { color:#cbd5e1; }
+
+  /* ── Origin type badges ── */
+  .otype-badge { padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .otype-S3         { background:#2a1f0a; color:#fb923c; }
+  .otype-ALB        { background:#1e2040; color:#a5b4fc; }
+  .otype-custom     { background:#1e2130; color:#94a3b8; }
+  .otype-apigw      { background:#14352a; color:#6ee7b7; }
+
+  /* ── Cache behavior summary ── */
+  .cb-row { display:flex; align-items:center; gap:10px; padding:9px 0;
+            border-bottom:1px solid #1e2130; font-size:13px; flex-wrap:wrap; }
+  .cb-row:last-child { border-bottom:none; }
+  .cb-path  { color:#f1f5f9; font-family:monospace; flex:1; min-width:120px; }
+  .cb-label { font-size:11px; color:#475569; }
+  .cb-value { color:#cbd5e1; }
+
+  .no-results { color:#475569; font-size:14px; text-align:center; padding:40px 0; }
+  .error-msg  { background:#2a1010; border:1px solid #5a2020; border-radius:8px;
+                padding:12px 16px; color:#fca5a5; font-size:13px; margin-bottom:20px; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('cf_distributions', 0) }}</span><span class="stat-lbl">Distributions</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('cf_origins', 0) }}</span><span class="stat-lbl">Origins</span></div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ══════════════════════════════════════════════════
+     DETAIL VIEW
+════════════════════════════════════════════════════ -->
+{% if view == 'detail' and detail %}
+{% set d = detail.dist %}
+{% set aliases = d.aliases | fromjson if d.aliases else [] %}
+{% set dcb = d.default_cache_behavior | fromjson if d.default_cache_behavior else {} %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/cloudfront">CloudFront</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/cloudfront?q={{ query }}">Results</a><span>›</span>{% endif %}
+  {{ d.distribution_id }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div class="detail-title">{{ d.distribution_id }}</div>
+    {% set sc = d.status | lower %}
+    <span class="status-badge status-{{ 'deployed' if sc == 'deployed' else ('inprogress' if 'progress' in sc else 'other') }}">
+      {{ d.status }}
+    </span>
+    {% if not d.enabled %}
+    <span class="disabled-badge">Disabled</span>
+    {% endif %}
+    {% if d.viewer_cert_source %}
+    <span class="cert-badge cert-{{ d.viewer_cert_source }}">
+      🔐 {{ {'acm': 'ACM', 'cloudfront': 'CF Default', 'iam': 'IAM'}.get(d.viewer_cert_source, d.viewer_cert_source) }}
+    </span>
+    {% endif %}
+    {% if d.waf_web_acl_id %}
+    <span class="waf-badge">🛡 WAF</span>
+    {% endif %}
+  </div>
+  <div class="detail-sub">{{ d.domain_name }}{% if d.comment %} — {{ d.comment }}{% endif %}</div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ d.account_name }}</span></div>
+    <div class="detail-meta-item">Price Class: <span>{{ d.price_class | replace('PriceClass_', 'Class ') }}</span></div>
+    <div class="detail-meta-item">HTTP Version: <span>{{ d.http_version }}</span></div>
+    <div class="detail-meta-item">Origins: <span>{{ d.origin_count }}</span></div>
+    <div class="detail-meta-item">Cache Behaviors: <span>{{ d.cache_behavior_count + 1 }} (incl. default)</span></div>
+    {% if d.last_modified %}
+    <div class="detail-meta-item">Last Modified: <span>{{ d.last_modified.strftime('%Y-%m-%d') }}</span></div>
+    {% endif %}
+  </div>
+  {% if detail.tags %}
+  <div style="margin-top:10px;">
+    <button class="tags-pill" onclick="toggleTagPopover(this, event)"
+            data-tags='{{ detail.tags | tojson }}'>
+      🏷 {{ detail.tags | length }} tag{{ 's' if detail.tags | length != 1 else '' }}
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Aliases (CNAMEs) -->
+{% if aliases %}
+<div class="section-card">
+  <div class="section-title">Alternate Domain Names / CNAMEs ({{ aliases | length }})</div>
+  {% for alias in aliases %}
+  <span class="alias-chip">{{ alias }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Origins -->
+<div class="section-card">
+  <div class="section-title">Origins ({{ detail.origins | length }})</div>
+  {% if detail.origins %}
+  {% for o in detail.origins %}
+  {% set otype_cls = {'S3': 'S3', 'ALB/ELB': 'ALB', 'API Gateway': 'apigw'}.get(o.origin_type, 'custom') %}
+  <div class="origin-card">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div class="origin-domain">{{ o.domain_name }}</div>
+      <span class="otype-badge otype-{{ otype_cls }}">{{ o.origin_type }}</span>
+      {% if o.https_only %}
+      <span style="background:#1e2a14;color:#86efac;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700;">HTTPS Only</span>
+      {% endif %}
+    </div>
+    <div class="origin-meta">
+      <div class="origin-meta-item">ID: <span>{{ o.origin_id }}</span></div>
+      {% if o.origin_path %}
+      <div class="origin-meta-item">Path: <span>{{ o.origin_path }}</span></div>
+      {% endif %}
+      {% if o.protocol_policy %}
+      <div class="origin-meta-item">Protocol: <span>{{ o.protocol_policy }}</span></div>
+      {% endif %}
+      {% if o.connection_attempts %}
+      <div class="origin-meta-item">Attempts: <span>{{ o.connection_attempts }}</span></div>
+      {% endif %}
+      {% if o.connection_timeout %}
+      <div class="origin-meta-item">Timeout: <span>{{ o.connection_timeout }}s</span></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="color:#475569;font-size:13px;">No origin data available.</div>
+  {% endif %}
+</div>
+
+<!-- Default Cache Behavior -->
+{% if dcb %}
+<div class="section-card">
+  <div class="section-title">Default Cache Behavior</div>
+  <div class="kv-grid">
+    {% if dcb.target_origin_id %}
+    <div class="kv-label">Target Origin</div>
+    <div class="kv-value">{{ dcb.target_origin_id }}</div>
+    {% endif %}
+    {% if dcb.viewer_protocol_policy %}
+    <div class="kv-label">Viewer Protocol</div>
+    <div class="kv-value">{{ dcb.viewer_protocol_policy }}</div>
+    {% endif %}
+    <div class="kv-label">Compress</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if dcb.compress else 'bool-no' }}">{{ 'Yes' if dcb.compress else 'No' }}</span>
+    </div>
+    {% if dcb.cache_policy_id %}
+    <div class="kv-label">Cache Policy ID</div>
+    <div class="kv-value">{{ dcb.cache_policy_id }}</div>
+    {% endif %}
+    {% if dcb.origin_request_policy %}
+    <div class="kv-label">Origin Request Policy</div>
+    <div class="kv-value">{{ dcb.origin_request_policy }}</div>
+    {% endif %}
+    {% if dcb.allowed_methods %}
+    <div class="kv-label">Allowed Methods</div>
+    <div class="kv-value">{{ dcb.allowed_methods | join(', ') }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Security & Configuration -->
+<div class="section-card">
+  <div class="section-title">Security &amp; Configuration</div>
+  <div class="kv-grid">
+    <div class="kv-label">IPv6</div>
+    <div class="kv-value">
+      <span class="{{ 'bool-yes' if d.ipv6_enabled else 'bool-no' }}">{{ 'Enabled' if d.ipv6_enabled else 'Disabled' }}</span>
+    </div>
+    <div class="kv-label">TLS Minimum</div>
+    <div class="kv-value">{{ d.minimum_protocol_version or '—' }}</div>
+    <div class="kv-label">SSL Support Method</div>
+    <div class="kv-value">{{ d.ssl_support_method or '—' }}</div>
+    {% if d.acm_cert_arn %}
+    <div class="kv-label">ACM Certificate</div>
+    <div class="kv-value" style="font-size:11px;">{{ d.acm_cert_arn }}</div>
+    {% endif %}
+    <div class="kv-label">Geo Restriction</div>
+    <div class="kv-value">
+      {% if d.geo_restriction_type and d.geo_restriction_type != 'none' %}
+        {% set geo_locs = d.geo_restriction_locations | fromjson if d.geo_restriction_locations else [] %}
+        <span class="bool-warn">{{ d.geo_restriction_type | title }}</span>
+        {% if geo_locs %}— {{ geo_locs | join(', ') }}{% endif %}
+      {% else %}
+        <span class="bool-no">None</span>
+      {% endif %}
+    </div>
+    {% if d.waf_web_acl_id %}
+    <div class="kv-label">WAF Web ACL</div>
+    <div class="kv-value" style="font-size:11px;">{{ d.waf_web_acl_id }}</div>
+    {% endif %}
+    <div class="kv-label">Distribution ID</div>
+    <div class="kv-value">{{ d.distribution_id }}</div>
+    {% if d.distribution_arn %}
+    <div class="kv-label">ARN</div>
+    <div class="kv-value" style="font-size:11px;">{{ d.distribution_arn }}</div>
+    {% endif %}
+    <div class="kv-label">Last Collected</div>
+    <div class="kv-value">{{ d.last_seen }}</div>
+  </div>
+</div>
+
+{% if detail.tags %}
+<div class="section-card">
+  <div class="section-title">Tags ({{ detail.tags | length }})</div>
+  <div class="kv-grid">
+    {% for tag in detail.tags %}
+    <div class="kv-label">{{ tag.k }}</div>
+    <div class="kv-value">{{ tag.v or '—' }}</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ══════════════════════════════════════════════════
+     LIST VIEW
+════════════════════════════════════════════════════ -->
+{% else %}
+
+{% if error %}
+<div class="error-msg">{{ error }}</div>
+{% endif %}
+
+<form method="get" action="/aws-inventory/cloudfront">
+  <div class="search-row">
+    <input type="text" name="q" value="{{ query }}"
+           placeholder="Search distribution ID, domain, CNAME, account…" autofocus>
+    <button type="submit">Search</button>
+  </div>
+</form>
+
+{% if distributions %}
+  {% for d in distributions %}
+  {% set sc = d.status | lower %}
+  {% set aliases = d.aliases | fromjson if d.aliases else [] %}
+  <div class="cf-card">
+    <div class="cf-card-header">
+      <div style="flex:1;min-width:0;">
+        <div class="cf-card-title">{{ d.domain_name }}</div>
+        <div class="cf-card-sub">
+          {{ d.distribution_id }}
+          {% if d.comment %} — {{ d.comment }}{% endif %}
+        </div>
+      </div>
+      <span class="status-badge status-{{ 'deployed' if sc == 'deployed' else ('inprogress' if 'progress' in sc else 'other') }}">
+        {{ d.status }}
+      </span>
+      {% if not d.enabled %}
+      <span class="disabled-badge">Disabled</span>
+      {% endif %}
+      {% if d.viewer_cert_source %}
+      <span class="cert-badge cert-{{ d.viewer_cert_source }}">
+        🔐 {{ {'acm': 'ACM', 'cloudfront': 'CF Default', 'iam': 'IAM'}.get(d.viewer_cert_source, d.viewer_cert_source) }}
+      </span>
+      {% endif %}
+      {% if d.waf_web_acl_id %}
+      <span class="waf-badge">🛡 WAF</span>
+      {% endif %}
+      <div class="cf-card-actions">
+        <a class="btn-detail"
+           href="/aws-inventory/cloudfront?dist_id={{ d.distribution_id }}&account={{ d.account_name }}{% if query %}&q={{ query }}{% endif %}">
+          Details →
+        </a>
+      </div>
+    </div>
+
+    {% if aliases %}
+    <div style="margin-top:8px;">
+      {% for alias in aliases %}<span class="alias-chip">{{ alias }}</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="cf-card-meta">
+      <div class="cf-meta-item">Account: <span>{{ d.account_name }}</span></div>
+      <div class="cf-meta-item">Price Class: <span>{{ d.price_class | replace('PriceClass_', 'Class ') }}</span></div>
+      <div class="cf-meta-item">Origins: <span>{{ d.origin_count }}</span></div>
+      <div class="cf-meta-item">Cache Behaviors: <span>{{ d.cache_behavior_count + 1 }}</span></div>
+      <div class="cf-meta-item">HTTP: <span>{{ d.http_version }}</span></div>
+      <div class="cf-meta-item">TLS Min: <span>{{ d.minimum_protocol_version or '—' }}</span></div>
+      {% if d.geo_restriction_type and d.geo_restriction_type != 'none' %}
+      <div class="cf-meta-item">Geo: <span class="bool-warn">{{ d.geo_restriction_type | title }}</span></div>
+      {% endif %}
+      {% if d.last_modified %}
+      <div class="cf-meta-item">Modified: <span>{{ d.last_modified.strftime('%Y-%m-%d') }}</span></div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if distributions | length == 300 %}
+  <div style="text-align:center;color:#475569;font-size:12px;padding:12px 0;">
+    Showing first 300 results — refine your search to narrow results.
+  </div>
+  {% endif %}
+
+{% elif query %}
+  <div class="no-results">No distributions found matching "{{ query }}"</div>
+{% else %}
+  <div class="no-results">No CloudFront distributions found. Add <code>cloudfront_collect = true</code> to accounts in config.ini and run collect_cloudfront.py.</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTagPopover(btn, e) {
+  e.stopPropagation();
+  const existing = document.querySelector('.tag-popover');
+  if (existing) {
+    const wasThis = existing._btn === btn;
+    existing.remove();
+    if (wasThis) return;
+  }
+  const tags = JSON.parse(btn.dataset.tags || '[]');
+  const pop  = document.createElement('div');
+  pop.className = 'tag-popover';
+  pop._btn = btn;
+  const title = document.createElement('div');
+  title.className = 'tag-popover-title';
+  title.textContent = 'Tags (' + tags.length + ')';
+  pop.appendChild(title);
+  tags.forEach(function(t) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.innerHTML = '<span class="tag-key">' + escHtml(t.k) + '</span>' +
+                    '<span class="tag-val">' + (t.v ? escHtml(t.v) : '<em style="color:#475569">—</em>') + '</span>';
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const rect = btn.getBoundingClientRect();
+  let top  = rect.bottom + 6;
+  let left = rect.left;
+  if (left + 340 > window.innerWidth - 16) left = window.innerWidth - 340 - 16;
+  pop.style.top  = top  + 'px';
+  pop.style.left = left + 'px';
+}
+document.addEventListener('click', function() {
+  document.querySelectorAll('.tag-popover').forEach(function(p) { p.remove(); });
+});
+</script>
+{% endblock %}

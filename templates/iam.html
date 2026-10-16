@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}IAM{% endblock %}
+
+{% block head %}
+<style>
+  .breadcrumb { font-size:13px; color:#475569; margin-bottom:20px; }
+  .breadcrumb a { color:#7dd3fc; text-decoration:none; }
+  .breadcrumb a:hover { text-decoration:underline; }
+  .breadcrumb span { color:#64748b; margin:0 6px; }
+
+  .detail-header { background:#141722; border:1px solid #2d3148; border-radius:10px; padding:20px 24px; margin-bottom:24px; }
+  .detail-title  { font-size:20px; font-weight:700; color:#f1f5f9; }
+  .detail-sub    { font-size:13px; color:#64748b; margin-top:4px; font-family:monospace; word-break:break-all; }
+  .detail-meta   { display:flex; flex-wrap:wrap; gap:16px; margin-top:14px; }
+  .detail-meta-item { font-size:13px; color:#64748b; }
+  .detail-meta-item span { color:#cbd5e1; font-weight:500; }
+
+  .policy-block  { background:#141722; border:1px solid #2d3148; border-radius:10px; margin-bottom:12px; overflow:hidden; }
+  .policy-header { display:flex; align-items:center; gap:10px; padding:14px 18px; cursor:pointer; user-select:none; transition:background .15s; }
+  .policy-header:hover { background:#1a1d27; }
+  .policy-header-name { font-size:14px; font-weight:600; color:#f1f5f9; flex:1; }
+  .policy-chevron { color:#475569; font-size:16px; transition:transform .2s; }
+  .policy-chevron.open { transform:rotate(90deg); }
+  .policy-body { display:none; border-top:1px solid #1e2130; padding:16px 18px; }
+  .policy-body.open { display:block; }
+
+  .stmt-block { background:#0f1117; border:1px solid #1e2130; border-radius:8px; padding:14px 16px; margin-bottom:10px; }
+  .stmt-effect-allow { border-left:3px solid #6ee7b7; }
+  .stmt-effect-deny  { border-left:3px solid #fca5a5; }
+  .stmt-sid   { font-size:11px; color:#475569; margin-bottom:8px; font-style:italic; }
+  .stmt-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#64748b; margin-bottom:4px; }
+  .stmt-section { margin-bottom:10px; }
+  .action-chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0; background:#1a2a1a; color:#86efac; border-radius:4px; font-family:monospace; font-size:12px; }
+  .action-chip.deny    { background:#2a1a1a; color:#fca5a5; }
+  .action-chip.wildcard{ background:#2a2a0a; color:#fde68a; }
+  .resource-chip { display:inline-block; padding:2px 8px; margin:2px 3px 2px 0; background:#1a1a2a; color:#a5b4fc; border-radius:4px; font-family:monospace; font-size:11px; word-break:break-all; }
+  .cond-block { background:#1a1d27; border-radius:6px; padding:8px 12px; font-family:monospace; font-size:11px; color:#94a3b8; white-space:pre-wrap; word-break:break-all; }
+
+  .trust-row { display:grid; grid-template-columns:100px 1fr 1fr; gap:10px; padding:9px 14px; background:#1a1d27; border-radius:7px; margin-bottom:6px; font-size:13px; }
+  .trust-type   { color:#fde68a; font-weight:600; }
+  .trust-arn    { font-family:monospace; font-size:12px; color:#a5f3fc; word-break:break-all; }
+  .trust-action { font-family:monospace; font-size:12px; color:#c4b5fd; }
+
+  .section-title { display:flex; align-items:center; gap:10px; font-size:16px; font-weight:600; color:#cbd5e1; margin:28px 0 14px; }
+  .no-data { color:#475569; font-size:13px; font-style:italic; padding:10px 0; }
+
+  .last-used-warn { color:#fde68a; font-size:12px; }
+  .last-used-old  { color:#fca5a5; font-size:12px; }
+  .last-used-ok   { color:#6ee7b7; font-size:12px; }
+
+  .view-tabs { display:flex; gap:4px; margin:24px 0 16px; border-bottom:1px solid #2d3148; padding-bottom:0; }
+  .view-tab  { padding:8px 18px; font-size:13px; font-weight:600; color:#64748b; background:transparent; border:1px solid transparent; border-bottom:none; border-radius:6px 6px 0 0; cursor:pointer; transition:color .15s,background .15s; margin-bottom:-1px; text-decoration:none; }
+  .view-tab:hover  { color:#cbd5e1; background:#1a1d27; }
+  .view-tab.active { color:#f1f5f9; background:#141722; border-color:#2d3148; }
+  .view-pane { display:none; }
+  .view-pane.active { display:block; }
+
+  .raw-json-wrap { background:#0f1117; border:1px solid #1e2130; border-radius:10px; padding:20px; overflow:auto; max-height:80vh; }
+  .raw-json-wrap pre { margin:0; font-family:monospace; font-size:12px; color:#94a3b8; white-space:pre; line-height:1.6; }
+  .raw-json-copy { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:#1e3a5f; color:#93c5fd; border:1px solid #1e4976; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; transition:background .15s; margin-bottom:12px; }
+  .raw-json-copy:hover { background:#1e4976; }
+  .raw-json-copy.copied { background:#14352a; color:#6ee7b7; border-color:#1a4a2a; }
+
+  .scope-aws    { background:#14352a; color:#6ee7b7; }
+  .scope-local  { background:#1e2d4a; color:#93c5fd; }
+  .ptype-managed{ background:#2a1e4a; color:#c4b5fd; }
+  .ptype-inline { background:#2a1a1a; color:#fca5a5; }
+
+  .result-card { background:#141722; border:1px solid #2d3148; border-radius:10px; padding:16px 20px; margin-bottom:10px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; transition:border-color .15s; }
+  .result-card:hover { border-color:#3d4468; }
+  .card-icon { font-size:24px; }
+  .card-info { flex:1; min-width:200px; }
+  .card-name { font-size:15px; font-weight:600; color:#f1f5f9; }
+  .card-meta { font-size:12px; color:#64748b; margin-top:3px; }
+  .btn-detail { padding:6px 14px; background:#1e3a5f; color:#93c5fd; border:1px solid #1e4976; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:background .15s; }
+  .btn-detail:hover { background:#1e4976; }
+</style>
+{% endblock %}
+
+{% block stats %}
+<div class="stat"><span class="stat-num">{{ stats.get('accounts', 0) }}</span><span class="stat-lbl">Accounts</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('iam_users', 0) }}</span><span class="stat-lbl">Users</span></div>
+<div class="stat"><span class="stat-num">{{ stats.get('iam_roles', 0) }}</span><span class="stat-lbl">Roles</span></div>
+{% endblock %}
+
+{% block content %}
+{% set active_page = 'iam' %}
+
+<!-- ── Detail View ─────────────────────── -->
+{% if detail and detail.principal %}
+{% set p = detail.principal %}
+
+<div class="breadcrumb">
+  <a href="/aws-inventory/iam">IAM</a>
+  <span>›</span>
+  {% if query %}<a href="/aws-inventory/iam?q={{ query }}">{{ query }}</a><span>›</span>{% endif %}
+  {{ p.principal_name }}
+</div>
+
+<div class="detail-header">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <span style="font-size:28px;">{{ '👤' if p.principal_type == 'user' else '🤖' }}</span>
+    <div>
+      <div class="detail-title">{{ p.principal_name }}</div>
+      <div class="detail-sub">{{ p.arn }}</div>
+    </div>
+    <span class="type-badge type-{{ p.principal_type }}" style="margin-left:auto;">
+      {{ p.principal_type | upper }}
+    </span>
+  </div>
+  <div class="detail-meta">
+    <div class="detail-meta-item">Account: <span>{{ p.account_name }}</span></div>
+    <div class="detail-meta-item">Created: <span>{{ p.created_at or '—' }}</span></div>
+    <div class="detail-meta-item">
+      Last Used:
+      {% if p.last_used %}<span class="last-used-ok">{{ p.last_used }}</span>
+      {% else %}<span class="last-used-old">Never</span>{% endif %}
+    </div>
+    {% if p.extra %}
+    <div class="detail-meta-item">{{ p.extra }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- View Tabs -->
+<div class="view-tabs">
+  <button class="view-tab active" onclick="switchTab(this,'tab-formatted')">📋 Formatted</button>
+  <button class="view-tab"        onclick="switchTab(this,'tab-rawjson')">{ } Raw JSON</button>
+</div>
+
+<!-- ── Formatted Pane ── -->
+<div id="tab-formatted" class="view-pane active">
+
+<!-- Policies -->
+<div class="section-title">
+  <span class="badge badge-blue">Policies</span>
+  {{ detail.policies | length }} attached
+</div>
+
+{% if detail.policies %}
+{% for pol in detail.policies %}
+<div class="policy-block">
+  <div class="policy-header" onclick="togglePolicy(this)">
+    <span class="policy-chevron">›</span>
+    <span class="policy-header-name">{{ pol.policy_name }}</span>
+    <span class="badge ptype-{{ pol.policy_type }}">{{ pol.policy_type }}</span>
+    <span class="badge scope-{{ pol.scope }}">{{ pol.scope }}</span>
+  </div>
+  <div class="policy-body">
+    {% set stmts = detail.stmt_map.get(pol.policy_name, []) %}
+    {% if stmts %}
+    {% for stmt in stmts %}
+    <div class="stmt-block stmt-effect-{{ stmt.effect | lower }}">
+      {% if stmt.sid %}<div class="stmt-sid">SID: {{ stmt.sid }}</div>{% endif %}
+      <div class="stmt-section">
+        <div class="stmt-label">Effect</div>
+        <span class="type-badge {{ 'type-ec2' if stmt.effect == 'Allow' else 'type-vpc' }}">{{ stmt.effect }}</span>
+      </div>
+      <div class="stmt-section">
+        <div class="stmt-label">Actions</div>
+        {% set acts = stmt.actions if stmt.actions is iterable and stmt.actions is not string else [stmt.actions] %}
+        {% for a in acts %}
+        <span class="action-chip {{ 'wildcard' if '*' in a else ('deny' if stmt.effect == 'Deny' else '') }}">{{ a }}</span>
+        {% endfor %}
+      </div>
+      <div class="stmt-section">
+        <div class="stmt-label">Resources</div>
+        {% set ress = stmt.resources if stmt.resources is iterable and stmt.resources is not string else [stmt.resources] %}
+        {% for r in ress %}
+        <span class="resource-chip">{{ r }}</span>
+        {% endfor %}
+      </div>
+      {% if stmt.conditions %}
+      <div class="stmt-section">
+        <div class="stmt-label">Conditions</div>
+        <div class="cond-block">{{ stmt.conditions }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <p class="no-data">No statements available.</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p class="no-data">No policies attached.</p>
+{% endif %}
+
+<!-- Trust Relationships (roles only) -->
+{% if p.principal_type == 'role' %}
+<div class="section-title">
+  <span class="badge badge-green">Trust Relationships</span>
+  Who can assume this role
+</div>
+{% if detail.trusts %}
+<div style="background:#141722;border:1px solid #2d3148;border-radius:10px;overflow:hidden;padding:14px 18px;">
+  <div class="trust-row" style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#475569;background:transparent;">
+    <div>Type</div><div>Trusted Principal</div><div>Action</div>
+  </div>
+  {% for t in detail.trusts %}
+  <div class="trust-row">
+    <div class="trust-type">{{ t.trusted_type }}</div>
+    <div class="trust-arn">{{ t.trusted_arn }}</div>
+    <div class="trust-action">{{ t.actions }}</div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<p class="no-data">No trust relationships found.</p>
+{% endif %}
+{% endif %}
+
+<!-- EC2 Associations -->
+{% if detail.ec2_associations %}
+<div class="section-title">
+  <span class="badge badge-blue">Resource Associations</span>
+  EC2 instances using this role
+</div>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Account</th><th>Type</th><th>Name</th><th>AWS ID</th><th>IP</th><th>Region</th></tr></thead>
+    <tbody>
+      {% for r in detail.ec2_associations %}
+      <tr>
+        <td><span class="account-badge">{{ r.account_name }}</span></td>
+        <td><span class="type-badge type-{{ r.type }}">{{ r.type | upper }}</span></td>
+        <td class="bold">{{ r.name }}</td>
+        <td class="mono">{{ r.aws_id }}</td>
+        <td class="mono">{{ r.ipadd or '—' }}</td>
+        <td>{{ r.region }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+</div><!-- /tab-formatted -->
+
+<!-- ── Raw JSON Pane ── -->
+<div id="tab-rawjson" class="view-pane">
+  <button class="raw-json-copy" id="rawJsonCopyBtn" onclick="copyRawJson()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+    Copy JSON
+  </button>
+  <div class="raw-json-wrap">
+    <pre id="rawJsonContent">{{ detail | tojson(indent=2) }}</pre>
+  </div>
+</div><!-- /tab-rawjson -->
+
+<!-- ── Search View ─────────────────────── -->
+{% else %}
+
+<section class="search-section">
+  <h1>IAM Search</h1>
+  <p class="subtitle">Search by username, role name, or ARN to see attached policies and permissions across all accounts.</p>
+  <form method="GET" action="/aws-inventory/iam" autocomplete="off">
+    <div class="search-bar">
+      <input type="text" name="q"
+             placeholder="e.g. deploy-role  |  arn:aws:iam::123456789:role/MyRole  |  john.doe"
+             value="{{ query }}" autofocus minlength="2"/>
+      <button type="submit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        Search
+      </button>
+    </div>
+  </form>
+  {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+</section>
+
+{% if results is not none %}
+  {% set total = results.users|length + results.roles|length %}
+  {% if total == 0 %}
+  <div class="no-results">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+         stroke="#aaa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      <line x1="8" y1="11" x2="14" y2="11"/>
+    </svg>
+    <p>No IAM principals found for <strong>{{ query }}</strong></p>
+    <p class="hint">Try a partial name, ARN fragment, or account name.</p>
+  </div>
+  {% else %}
+  <div class="results-header">
+    Found <strong>{{ total }}</strong> result{{ 's' if total != 1 }} for <em>{{ query }}</em>
+  </div>
+
+  {% if results.users %}
+  <h2 class="table-title"><span class="badge badge-blue">Users</span><span class="count">{{ results.users|length }}</span></h2>
+  {% for u in results.users %}
+  <div class="result-card">
+    <div class="card-icon">👤</div>
+    <div class="card-info">
+      <div class="card-name">{{ u.principal_name }}</div>
+      <div class="card-meta">
+        <span class="account-badge">{{ u.account_name }}</span>
+        &nbsp;·&nbsp; {{ u.arn }}
+        {% if u.last_used %}&nbsp;·&nbsp; Last used: <span class="last-used-ok">{{ u.last_used }}</span>{% endif %}
+      </div>
+    </div>
+    <a class="btn-detail" href="/aws-inventory/iam?principal_id={{ u.principal_id }}&account={{ u.account_name }}&q={{ query }}">View Policies →</a>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if results.roles %}
+  <h2 class="table-title"><span class="badge badge-green">Roles</span><span class="count">{{ results.roles|length }}</span></h2>
+  {% for r in results.roles %}
+  <div class="result-card">
+    <div class="card-icon">🤖</div>
+    <div class="card-info">
+      <div class="card-name">{{ r.principal_name }}</div>
+      <div class="card-meta">
+        <span class="account-badge">{{ r.account_name }}</span>
+        &nbsp;·&nbsp; {{ r.arn }}
+        {% if r.last_used %}&nbsp;·&nbsp; Last used: <span class="last-used-ok">{{ r.last_used }}</span>{% endif %}
+      </div>
+    </div>
+    <a class="btn-detail" href="/aws-inventory/iam?principal_id={{ r.principal_id }}&account={{ r.account_name }}&q={{ query }}">View Policies →</a>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endif %}
+{% endif %}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePolicy(header) {
+  const body    = header.nextElementSibling;
+  const chevron = header.querySelector('.policy-chevron');
+  body.classList.toggle('open');
+  chevron.classList.toggle('open');
+}
+
+function switchTab(btn, paneId) {
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.view-pane').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(paneId).classList.add('active');
+}
+
+function copyRawJson() {
+  const text = document.getElementById('rawJsonContent').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('rawJsonCopyBtn');
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy JSON';
+    }, 2000);
+  });
+}
+</script>
+{% endblock %}
