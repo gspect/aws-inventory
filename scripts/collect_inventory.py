@@ -17,7 +17,6 @@ import socket
 import sys
 from datetime import datetime
 import argparse
-import boto3
 import mysql.connector
 from botocore.exceptions import ClientError, NoCredentialsError
 
@@ -475,7 +474,7 @@ def main():
             continue
 
         if account["name"] not in r53_done:
-            print(f"  → Route53  (global)")
+            print("  → Route53  (global)")
             n = collect_route53(session, account["name"], cur, now)
             totals["dns"] += n
             print(f"       {n} records upserted")

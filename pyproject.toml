@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 120
+extend-exclude = ["venv"]
+
+[tool.ruff.lint]
+# Real errors only: syntax errors, undefined names, unused/duplicate imports, bad f-strings
+select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

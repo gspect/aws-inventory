@@ -9,7 +9,7 @@ import mysql.connector
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, ROOT)
 from config_loader import get_db_config
-from schema import SCHEMA, ensure_tables
+from schema import SCHEMA
 
 cfg = get_db_config()
 conn = mysql.connector.connect(**cfg)

@@ -113,7 +113,7 @@ for acct, name, ltype, scheme in LBS:
         state="active", vpc_id=a["vpc"], account_name=acct, region=a["region"], last_seen=TS)
     ins("aws_inventory_resources", name=name, aws_id=f"{prefix}/{name}/{lbid}",
         ipadd=f"{a['cidr']}.1.5, {a['cidr']}.2.5", account_name=acct, type=short, region=a["region"],
-        extra=f"DNS={dns} | Scheme={scheme} | State=active | SGs={SGS[acct]['alb']}", last_seen=TS)
+        extra=f"DNS={dns} | Scheme={scheme} | State=active | SGs={SGS[acct]['alb'] if short == 'alb' else ''}", last_seen=TS)
 
     tg_arn = f"arn:aws:elasticloadbalancing:{a['region']}:111111111111:targetgroup/{name}-tg/{hexid(16)}"
     ins("aws_lb_target_groups", tg_arn=tg_arn, tg_name=f"{name}-tg", target_type="instance",

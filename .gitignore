@@ -7,3 +7,5 @@ venv/
 .idea/
 scripts/cron-logs/
 .DS_Store
+.pytest_cache/
+.ruff_cache/

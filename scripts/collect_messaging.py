@@ -28,7 +28,6 @@ import sys
 import argparse
 from datetime import datetime, timezone
 
-import boto3
 import mysql.connector
 from botocore.exceptions import ClientError, NoCredentialsError
 

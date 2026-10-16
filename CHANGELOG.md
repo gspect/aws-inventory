@@ -22,6 +22,12 @@ All notable changes to the AWS Inventory Tool are documented here.
 - `aws_eks_node_history` was missing its `asg_name` column on fresh installs; it is now created, and added to existing tables automatically
 - `schema.py`: shortened a key on `sso_permission_set_policies` that exceeded MySQL's index size limit
 
+### Added — Tests and CI
+- Unit tests (config loader, schema, authentication/validation) and integration tests that run against MySQL with the demo data
+- GitHub Actions workflow: lint, unit tests on Python 3.11 and 3.13, and an integration job with a MySQL service container
+- `AWS_INVENTORY_CONFIG` environment variable to use a config file from another location
+- Removed unused imports and placeholder-less f-strings flagged by ruff
+
 ### Added — Demo
 - `demo/create_tables.py` and `demo/seed.py` load fake data so the UI can be explored without an AWS account
 

@@ -10,14 +10,12 @@ Requirements:
 import sys
 from datetime import datetime
 import argparse
-import boto3
 import mysql.connector
 from botocore.exceptions import ClientError, NoCredentialsError
 
 # ─────────────────────────────────────────────
 # CONFIG — loaded from config.ini
 # ─────────────────────────────────────────────
-import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from config_loader import get_db_config, get_accounts, get_session

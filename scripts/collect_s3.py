@@ -552,7 +552,7 @@ def main():
 
         # ── Skip accounts opted out in config.ini ────────────────────────
         if not acct.get("s3_collect", True):
-            print(f"  Skipping — s3_collect = false in config.ini")
+            print("  Skipping — s3_collect = false in config.ini")
             continue
 
         try:

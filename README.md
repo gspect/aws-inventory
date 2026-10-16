@@ -1,5 +1,7 @@
 # AWS Inventory Tool
 
+[![CI](https://github.com/gspect/aws-inventory/actions/workflows/ci.yml/badge.svg)](https://github.com/gspect/aws-inventory/actions/workflows/ci.yml)
+
 A web-based tool for searching and exploring AWS resources across multiple accounts. Built with Python, Flask, and MySQL.
 
 **Requirements:** Python 3.11+, MySQL 8.0+, and read-only access to the AWS accounts you want to inventory (or use the [demo data](#try-it-without-an-aws-account) with no AWS account at all).
@@ -70,6 +72,10 @@ aws-inventory/
 ├── config.ini.example                  # Template showing required config structure
 ├── config_loader.py                    # Loads DB config and AWS account credentials + collect flags
 ├── requirements.txt                    # Python dependencies
+├── requirements-dev.txt                # Test and lint tools (pytest, ruff)
+├── pyproject.toml                      # Ruff and pytest settings
+├── tests/                              # Unit tests + integration tests against real MySQL
+├── .github/workflows/ci.yml            # CI: lint, unit tests, integration tests
 ├── LICENSE                             # MIT
 ├── schema.py                           # Table definitions for collectors without inline DDL + sync_jobs
 ├── okta_auth.py                        # Okta OIDC authentication blueprint
@@ -171,6 +177,26 @@ DISABLE_AUTH=1 python app.py          # Windows PowerShell:  $env:DISABLE_AUTH=1
 ```
 
 Try searching for `app.example.com` and click **Trace**, or open the Security Groups, Network, S3 and EKS pages. The demo covers those pages; the others will be empty.
+
+---
+
+## Development and tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+ruff check .          # lint (syntax errors, undefined names, unused imports)
+pytest                # unit tests; no database or AWS access needed
+```
+
+The unit tests cover config parsing, the table definitions (including a check that every index fits MySQL's key-size limit), and the app's authentication and input validation.
+
+The integration tests load the demo data into a real MySQL database and check that every page renders, search works, and the traffic trace follows DNS to the instances. They **wipe the database named in the config**, so use a throwaway one:
+
+```bash
+AWS_INVENTORY_INTEGRATION=1 AWS_INVENTORY_CONFIG=/path/to/test-config.ini pytest tests/test_integration.py
+```
+
+GitHub Actions runs all of this on every push (the integration job uses a MySQL 8.4 service container). `AWS_INVENTORY_CONFIG` can also be used to point the app and collectors at a config file elsewhere.
 
 ---
 

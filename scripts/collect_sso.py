@@ -27,7 +27,6 @@ import sys
 import argparse
 from datetime import datetime, UTC
 
-import boto3
 import mysql.connector
 from botocore.exceptions import ClientError, NoCredentialsError
 
@@ -450,23 +449,23 @@ def main():
     iam      = session.client("iam",             region_name="us-west-2")
 
     # Account ID → Name map from Organizations
-    print(f"  → Resolving account names from Organizations")
+    print("  → Resolving account names from Organizations")
     account_map = get_account_name_map(session)
     print(f"       {len(account_map)} accounts found")
 
-    print(f"  → Users")
+    print("  → Users")
     n, user_map = collect_users(id_store, store_id, acct_name, cur, now)
     print(f"       {n} users upserted")
 
-    print(f"  → Groups & Memberships")
+    print("  → Groups & Memberships")
     n = collect_groups(id_store, store_id, acct_name, user_map, cur, now)
     print(f"       {n} groups upserted")
 
-    print(f"  → Permission Sets & Policies")
+    print("  → Permission Sets & Policies")
     ps_map = collect_permission_sets(sso, iam, instance_arn, acct_name, cur, now)
     print(f"       {len(ps_map)} permission sets upserted")
 
-    print(f"  → Account Assignments")
+    print("  → Account Assignments")
     n = collect_assignments(
         sso, id_store, store_id, instance_arn,
         ps_map, user_map, account_map,
@@ -477,7 +476,7 @@ def main():
     conn.commit()
 
     print(f"\n{'═'*60}")
-    print(f"✅  Identity Center sync complete")
+    print("✅  Identity Center sync complete")
     print(f"{'═'*60}")
 
     cur.close()

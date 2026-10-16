@@ -428,7 +428,7 @@ def main():
                     cluster_names.extend(page.get("clusters", []))
 
                 if not cluster_names:
-                    print(f"     —  no clusters")
+                    print("     —  no clusters")
                     continue
 
                 c_count  = 0

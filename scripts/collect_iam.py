@@ -10,16 +10,14 @@ Requirements:
 
 import json
 import sys
-from datetime import datetime, timezone, UTC
+from datetime import datetime, UTC
 
-import boto3
 import mysql.connector
 from botocore.exceptions import ClientError, NoCredentialsError
 
 # ─────────────────────────────────────────────
 # CONFIG — loaded from config.ini
 # ─────────────────────────────────────────────
-import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from config_loader import get_db_config, get_accounts, get_session
@@ -466,12 +464,12 @@ def main():
         # IAM is global — one client per account, no region loop needed
         iam = session.client("iam", region_name="us-east-1")
 
-        print(f"  → IAM Users")
+        print("  → IAM Users")
         n = collect_users(iam, account["name"], cur, now)
         totals["users"] += n
         print(f"       {n} users upserted")
 
-        print(f"  → IAM Roles")
+        print("  → IAM Roles")
         n = collect_roles(iam, account["name"], cur, now)
         totals["roles"] += n
         print(f"       {n} roles upserted")
@@ -479,7 +477,7 @@ def main():
         conn.commit()
 
     print(f"\n{'═'*60}")
-    print(f"✅  Done")
+    print("✅  Done")
     print(f"   Users: {totals['users']}")
     print(f"   Roles: {totals['roles']}")
     print(f"{'═'*60}")

@@ -9,7 +9,11 @@ import boto3
 
 # Always resolve config.ini relative to this file's location
 # so scripts can be run from any directory
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini")
+# (override with the AWS_INVENTORY_CONFIG environment variable)
+CONFIG_PATH = os.environ.get(
+    "AWS_INVENTORY_CONFIG",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.ini"),
+)
 
 
 def load_config(path: str = CONFIG_PATH) -> configparser.ConfigParser:

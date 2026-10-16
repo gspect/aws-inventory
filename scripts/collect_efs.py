@@ -19,7 +19,6 @@ Usage:
     python3 collect_efs.py --account my-account-name
 """
 
-import json
 import sys
 import argparse
 from datetime import datetime, timezone
